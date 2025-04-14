@@ -1,0 +1,4 @@
+#ifndef LISTENDEVICE_H
+#define LISTENDEVICE_H
+
+#endif // LISTENDEVICE_H
