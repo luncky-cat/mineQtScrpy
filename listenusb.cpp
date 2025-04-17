@@ -1,19 +1,23 @@
 #include "listenusb.h"
+#include "DeviceInfo.h"
+
+ListenUsb ListenUsb::instance;
+
+ListenUsb::ListenUsb():interval(2000)
+{
+    init();
+}
+
+ListenUsb::~ListenUsb()
+{
+    //stopListening();
+}
 
 void ListenUsb::init() {
     timer = new QTimer(this);
     process=new QProcess(this);
     connect(timer, &QTimer::timeout, this, &ListenUsb::scanDevices);
-    startListening();
-}
-
-ListenUsb::ListenUsb():interval(300) {
-    init();
-}
-
-ListenUsb::ListenUsb(qint32 interval):interval(interval)
-{
-    init();
+    ListenDevice::registerListener(this);
 }
 
 void ListenUsb::startListening()
@@ -28,24 +32,32 @@ void ListenUsb::stopListening()
 
 void ListenUsb::scanDevices()
 {
-    process->start("adb", {"devices"});
+    process->start("scrcpy/adb.exe", { "devices" });
     process->waitForFinished();
     QString output = process->readAllStandardOutput();
-    QStringList lines = output.split("\n",Qt::SkipEmptyParts);
+    QStringList lines = output.split("\n", Qt::SkipEmptyParts);
+
     QString errorOutput = process->readAllStandardError();
     if (!errorOutput.isEmpty()) {
         qWarning() << "Error in adb command:" << errorOutput;
     }
-    QStringList devices;
-    for (const QString &line : lines) {
-        if (line.contains("\tdevice")) {
+
+    // 获取当前设备列表
+    QSet<DeviceInfo> currentDevices;
+    for (const QString& line : lines) {
+        if (line.contains("\tdevice")&&!line.contains(":")) {
             QStringList parts = line.split("\t");
             if (parts.size() >= 2) {
-                devices.append(parts.first());  // 获取设备 ID
+                DeviceInfo info;
+                info.deviceType = QString("USB");
+                info.serialNumber = parts.first();
+                currentDevices.insert(info);
             }
         }
     }
-    emit updateDeviceConnection(devices);
+
+ 
+    ListenDevice::updateChangeSet(currentDevices);
 }
 
 
