@@ -1,6 +1,9 @@
 QT       += core gui
 QT += multimedia
 QT += multimediawidgets
+QT+=network
+QT += concurrent
+
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -13,20 +16,28 @@ CONFIG += c++17
 SOURCES += \
     androiddevice.cpp \
     androidmanager.cpp \
-    devicemanager.cpp \
+    listenusb.cpp \
+    listenwifi.cpp \
     main.cpp \
     mainwindow.cpp \
+    networkutils.cpp \
     phoneshow.cpp \
-    showlayout.cpp
+    showlayout.cpp \
+    wifiscanner.cpp
 
 HEADERS += \
     androiddevice.h \
     androidmanager.h \
     device.h \
     devicemanager.h \
+    listenDevice.h \
+    listenusb.h \
+    listenwifi.h \
     mainwindow.h \
+    networkutils.h \
     phoneshow.h \
-    showlayout.h
+    showlayout.h \
+    wifiscanner.h
 
 FORMS += \
     mainwindow.ui

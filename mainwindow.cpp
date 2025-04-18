@@ -14,6 +14,8 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(show);
     ui->centralwidget->setLayout(layout);
     //setLayout(layout);
+    manger = new androidManager();
+    manger->listen();
 }
 
 MainWindow::~MainWindow()

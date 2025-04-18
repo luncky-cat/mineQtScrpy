@@ -9,7 +9,6 @@ class phoneShow : public QWidget
     Q_OBJECT
 public:
     explicit phoneShow(QWidget *parent = nullptr);
-
 signals:
 };
 
