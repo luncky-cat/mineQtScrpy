@@ -1,0 +1,24 @@
+# Qt & QMake
+*.pro.user
+*.qmake.stash
+*.pro.user.*
+*.autosave
+
+# Visual Studio files
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# QtCreator project files for Visual Studio
+*.qtvscr
+
+# Build output
+debug/
+release/
+build/
+
+#server 
+scrcpy/
+
