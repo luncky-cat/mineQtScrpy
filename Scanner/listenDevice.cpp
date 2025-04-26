@@ -1,5 +1,4 @@
 #include "listenDevice.h"
-#include "../Device/DeviceInfo.h"
 
 QList<ListenDevice*> ListenDevice::listeners;   
 
@@ -18,9 +17,9 @@ void ListenDevice::listen()      //全部开启监听
     }
 }
 
-void ListenDevice::updateChangeSet(const QSet<DeviceInfo>& newDevices) {
-    QSet<DeviceInfo> currentNewDevices = newDevices - lastDevices;// 计算新增设备
-    QSet<DeviceInfo> currentRemovedDevices = lastDevices - newDevices;   // 计算移除设备
+void ListenDevice::updateChangeSet(const QSet<ConnectInfo>& newDevices) {
+    QSet<ConnectInfo> currentNewDevices = newDevices - lastDevices;// 计算新增设备
+    QSet<ConnectInfo> currentRemovedDevices = lastDevices - newDevices;   // 计算移除设备
     lastDevices = newDevices;// 更新 lastDevices 为当前设备
 
     if (!currentNewDevices.isEmpty()) {
@@ -31,3 +30,4 @@ void ListenDevice::updateChangeSet(const QSet<DeviceInfo>& newDevices) {
         emit devicesRemove(currentRemovedDevices);
     }
 }
+

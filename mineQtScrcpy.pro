@@ -1,7 +1,7 @@
-QT       += core gui
+QT += core gui
 QT += multimedia
 QT += multimediawidgets
-QT+=network
+QT += network
 QT += concurrent
 
 
@@ -13,36 +13,62 @@ CONFIG += c++17
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
+INCLUDEPATH+=$$PWD/include
+LIBS+=$$PWD/dll/libcrypto.dll
+LIBS+=$$PWD/dll/libssl.dll
+
+# 在.pro文件中定义宏
+
+
+
 SOURCES += \
-    androiddevice.cpp \
-    androidmanager.cpp \
-    listenusb.cpp \
-    listenwifi.cpp \
+    AdbCryptoUtils.cpp \
+    Manager/AddDeviceWorker.cpp \
+    Manager/RemoveDeviceWorker.cpp \
+    Manager/androidmanager.cpp \
+    Scanner/WifiScanner.cpp \
+    Scanner/WifiScannerTask.cpp \
+    Scanner/listenDevice.cpp \
+    Scanner/listenusb.cpp \
+    Scanner/listenwifi.cpp \
+    Scanner/networkutils.cpp \
     main.cpp \
     mainwindow.cpp \
-    networkutils.cpp \
     phoneshow.cpp \
     showlayout.cpp \
-    wifiscanner.cpp
 
 HEADERS += \
-    androiddevice.h \
+    AdbCryptoUtils.h \
+    Device/DeviceInfo.h \
+    Device/device.h \
+    Manager/AddDeviceWorker.h \
+    Manager/RemoveDeviceWorker.h \
+    Manager/androidmanager.h \
+    Manager/devicemanager.h \
+    RemoveDeviceWorker.h \
+    Scanner/WifiScanner.h \
+    Scanner/WifiScannerTask.h \
+    Scanner/listenDevice.h \
+    Scanner/listenusb.h \
+    Scanner/listenwifi.h \
+    Scanner/networkutils.h \
     androidmanager.h \
-    device.h \
-    devicemanager.h \
-    listenDevice.h \
-    listenusb.h \
-    listenwifi.h \
+    log.h \
     mainwindow.h \
-    networkutils.h \
     phoneshow.h \
     showlayout.h \
-    wifiscanner.h
+    ui_mainwindow.h \
 
 FORMS += \
     mainwindow.ui
+
+
+
+
+
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+

@@ -1,27 +1,25 @@
 #include "listenwifi.h"
+
 #include "networkutils.h"
 #include "wifiscanner.h"     //wifi扫描线程
-#include "DeviceInfo.h"
+#include "../Device/DeviceInfo.h"
 
 #include<QTimer>
 #include<QProcess>
+#include<QScopedPointer>
 
 ListenWifi ListenWifi::instance;  // 定义静态成员
 
-ListenWifi::ListenWifi() {
-    init();
+ListenWifi::ListenWifi():interval(5000),timer(new QTimer()),scanner(new WifiScanner()){
+    initSignals();
     ListenDevice::registerListener(this);
 }
 
-ListenWifi::~ListenWifi() {}
-
-void ListenWifi::init()
+void ListenWifi::initSignals()
 {
-    timer = new QTimer(this);
-    scanner = new WifiScanner();
-    connect(timer,&QTimer::timeout,this,&ListenWifi::scanDevices);
-    connect(scanner, &WifiScanner::DeviceFound, this, &ListenWifi::handleDeviceFound);
-    interval = 2000;
+    connect(timer.get(), &QTimer::timeout, this, &ListenWifi::scanDevices);
+   // connect(scanner, &WifiScanner::DeviceFound, this, &ListenWifi::handleDeviceFound);
+    connect(scanner, &WifiScanner::scanningFinished, this, &ListenWifi::onScanningFinished);
 }
 
 void ListenWifi::startListening()
@@ -31,38 +29,30 @@ void ListenWifi::startListening()
 
 void ListenWifi::stopListening()
 {
-
+    timer->stop();
 }
 
 
 void ListenWifi::handleDeviceFound(const QString& ip, int port) {
-    QSet<DeviceInfo> currentDevices;
-    QString fullAddress = QString("%1:%2").arg(ip).arg(port);
-    QProcess* process = new QProcess();
-    process->start("scrcpy/adb.exe", QStringList() << "-s" << fullAddress << "shell" << "getprop" << "ro.serialno");
-    process->waitForFinished();
 
-    QString serialOutput = process->readAllStandardOutput();
-    qDebug() << "Device serial number:" << serialOutput;
-
-    DeviceInfo info;
-    info.deviceType = QString("WIFI");
-    info.ipAddress = ip;
-    info.port = port;
-    info.serialNumber = serialOutput;
-    currentDevices.insert(info);
-
-    ListenDevice::updateChangeSet(currentDevices);   //立即执行
 }
-
 
 void ListenWifi::scanDevices()
 {
+    timer->stop();
     netWorkUtils::WifiInfo wifi = netWorkUtils::activeWifiInterface();
     QString startIp, endIp;
     netWorkUtils::getIpRange(wifi.ip, wifi.netmask, startIp, endIp);   //计算ip范围
     qDebug() << startIp << "" << endIp;
-    scanner->setWifiScanner(startIp,endIp,5555,5555);  //设置默认5555端口
+    scanner->setWifiScanner(startIp,"192.168.1.20",5555,5555);  //设置默认5555端口
     scanner->startScanning();
 }
 
+void ListenWifi::onScanningFinished(QSet<ConnectInfo>& currentDevices){
+
+    for(auto i:currentDevices){
+        qDebug()<<"ip+port:"<<i.ipAddress<<i.ipAddress;
+    }
+   ListenDevice::updateChangeSet(currentDevices);   //发送qdebug
+    timer->start(interval);
+}

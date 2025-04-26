@@ -2,27 +2,31 @@
 #define LISTENWIFI_H
 
 class WifiScanner;
-//struct DeviceInfo;
 
 #include "listenDevice.h"
+#include <QTimer>
+#include<QScopedPointer>
 
 class ListenWifi : public ListenDevice {
     Q_OBJECT
+
 private:
     ListenWifi();
-    ~ListenWifi();
-    void init();
-public slots:
-    void handleDeviceFound(const QString& ip, int port);
+    void initSignals();
+
 public:
     void startListening() override;
     void stopListening() override;
+
 public slots:
-    void scanDevices() override;
+    void scanDevices() override;  //实际扫描
+    void onScanningFinished(QSet<ConnectInfo>& currentDevices);   //发送);   //扫描结束
+    void handleDeviceFound(const QString& ip, int port);
+
 private:
-    WifiScanner *scanner;   //扫描器
-    QTimer *timer;
     qint32 interval;
+    QScopedPointer<QTimer> timer;
+    WifiScanner* scanner;
     static ListenWifi instance;  // 静态实例，确保在程序启动时创建
 };
 

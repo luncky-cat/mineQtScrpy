@@ -1,63 +1,89 @@
 #include "listenusb.h"
-#include "DeviceInfo.h"
+
+#include "../Device/DeviceInfo.h"
+
+#include <QCoreApplication>
+#include<QDir>
+#include<qDebug>
+#include <QString>
+#include <QSharedPointer>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <dbt.h>
+#endif
 
 ListenUsb ListenUsb::instance;
 
-ListenUsb::ListenUsb():interval(2000)
+ListenUsb::ListenUsb():interval(5000)
 {
-    init();
+    initSignals();
+    //qApp->installNativeEventFilter(this);
+    ListenDevice::registerListener(this);
 }
 
 ListenUsb::~ListenUsb()
 {
-    //stopListening();
+
 }
 
-void ListenUsb::init() {
-    timer = new QTimer(this);
-    process=new QProcess(this);
-    connect(timer, &QTimer::timeout, this, &ListenUsb::scanDevices);
-    ListenDevice::registerListener(this);
+void ListenUsb::initSignals(){
+     connect(&timer, &QTimer::timeout, this, &ListenUsb::scanDevices);
 }
 
 void ListenUsb::startListening()
 {
-    timer->start(interval);
+   timer.start(interval);
 }
 
 void ListenUsb::stopListening()
 {
-    timer->stop();
+    timer.stop();
 }
 
 void ListenUsb::scanDevices()
 {
-    process->start("scrcpy/adb.exe", { "devices" });
-    process->waitForFinished();
-    QString output = process->readAllStandardOutput();
+    process.start(QStringLiteral("D:/Documents/mineQtScrcpy/scrcpy/adb.exe"), { "devices" });
+    process.waitForFinished();
+    QString output = process.readAllStandardOutput();
     QStringList lines = output.split("\n", Qt::SkipEmptyParts);
-
-    QString errorOutput = process->readAllStandardError();
+    QString errorOutput = process.readAllStandardError();
     if (!errorOutput.isEmpty()) {
         qWarning() << "Error in adb command:" << errorOutput;
     }
 
     // 获取当前设备列表
-    QSet<DeviceInfo> currentDevices;
+    QSet<ConnectInfo> currentDevices;
     for (const QString& line : lines) {
         if (line.contains("\tdevice")&&!line.contains(":")) {
             QStringList parts = line.split("\t");
             if (parts.size() >= 2) {
-                DeviceInfo info;
-                info.deviceType = QString("USB");
-                info.serialNumber = parts.first();
+                ConnectInfo info;
+                info.deviceType=DeviceType::USB;
+                info.serialNumber=parts.first();
                 currentDevices.insert(info);
             }
         }
     }
 
- 
     ListenDevice::updateChangeSet(currentDevices);
 }
+//nativeEventFilter
+// bool ListenUsb::nativeEventFilter(const QByteArray &eventType, void *message, qintptr *result)
+// {
+//     Q_UNUSED(eventType);  // 告诉编译器该参数未使用
+
+// #ifdef Q_OS_WIN
+//     MSG* msg = static_cast<MSG*>(message);
+//     if (msg->message == WM_DEVICECHANGE) {
+//         if (msg->wParam == DBT_DEVICEARRIVAL || msg->wParam == DBT_DEVICEREMOVECOMPLETE) {
+//             qDebug() << "USB device plugged in or removed";
+//             // 触发设备扫描
+//             scanDevices();
+//         }
+//     }
+// #endif
+//     return false; // 返回 false 让其他过滤器继续处理该事件
+// }
 
 

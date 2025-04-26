@@ -2,45 +2,66 @@
 
 #include <QTcpSocket>
 #include <QDebug>
-#include <qprocess.h>
+#include <QTimer>
+#include <QNetworkProxy>
+#include <QEventLoop>
+#include <QThread>
 
-WifiScannerTask::WifiScannerTask(const QString& ip, quint16 startPort, quint16 endPort) :ip(ip), startPort(startPort), endPort(endPort){
-    process = new QProcess();
+WifiScannerTask::WifiScannerTask(const QString& ip, quint16 port)
+    : ip(ip), port(port)
+{
+    socket = new QTcpSocket();
+    socket->setProxy(QNetworkProxy::NoProxy);
+    initSignals();
 }
 
-WifiScannerTask:: WifiScannerTask(const QString& ip)
-    :ip(ip), startPort(5555), endPort(5555) {
-    process = new QProcess();
+WifiScannerTask::WifiScannerTask(const QString& ip)
+    : ip(ip), port(5555)
+{
+    socket = new QTcpSocket(this);  // 将 'this' 设置为父对象，确保父对象是正确的线程
+    socket->moveToThread(QThread::currentThread());  // 将socket移动到当前线程
+    socket->setProxy(QNetworkProxy::NoProxy);
+    initSignals();
 }
 
-QPair<QString, quint16> WifiScannerTask::run() {
-    for (quint16 port = startPort; port <= endPort; ++port) {
-        if (isAdbService(ip, port)) {
-            qDebug() << "WI-FI连接找到了!!!!"<<ip<<"port:"<<port;
-            return {ip,port};
-        }
-    }
-    return {};
+void WifiScannerTask::initSignals() {
+
+    connect(socket, &QTcpSocket::connected, this, &WifiScannerTask::onConnected, Qt::QueuedConnection);
+    connect(socket, &QTcpSocket::errorOccurred, this, &WifiScannerTask::onErrorOccurred, Qt::QueuedConnection);
+
 }
 
-bool WifiScannerTask::isAdbService(const QString& ip, quint16 port) {
-    QString fullAddress = QString("%1:%2").arg(ip).arg(port);
-    process->start("scrcpy/adb.exe",QStringList() << "connect" << fullAddress);
-    process->waitForFinished();
-    QString output = process->readAllStandardOutput();
-    QStringList lines = output.split("\n", Qt::SkipEmptyParts);
-    QString errorOutput = process->readAllStandardError();
-    if (!errorOutput.isEmpty()) {
-        qWarning() << "Error in adb command:" << errorOutput;
-        process->start("scrcpy/adb.exe", QStringList() << "connect" << fullAddress);
-        return false;
-    }
+void WifiScannerTask::onConnected() {
+    qDebug()<<"成："<<ip<<port;
+    emit deviceFound(ip,port);
+    QTimer::singleShot(0, this, [this]() {
+        socket->abort();  // 强制清理连接和内部状态
+        socket->close();  // 确保完全关闭
+        delete socket;    // 释放 socket
+        socket = nullptr; // 防止后续使用
+    });
+}
 
-   // qDebug() << output;
-    if (output.contains("connected") || output.contains("already connected")) {
-        return true;
-    }
+void WifiScannerTask::onErrorOccurred(QAbstractSocket::SocketError socketError) {
+    QTimer::singleShot(0, this, [this]() {
+        socket->abort();  // 强制清理连接和内部状态
+        socket->close();  // 确保完全关闭
+        delete socket;    // 释放 socket
+        socket = nullptr; // 防止后续使用
+    });
+}
 
-    process->start("scrcpy/adb.exe", QStringList() << "disconnect" << fullAddress);
-    return false;
+void WifiScannerTask::run() {
+
+    socket->connectToHost(ip, port);  // 尝试连接目标 IP 和端口
+    if (socket->waitForConnected(1000)) {
+        // 如果连接成功，触发 deviceFound 信号
+        emit deviceFound(ip, port);
+    } else {
+        // 处理连接失败
+    }
+}
+
+WifiScannerTask::~WifiScannerTask(){
+    //delete socket;
 }

@@ -2,22 +2,31 @@
 #define WIFISCANNERTASK_H
 
 #include <QString>
-#include<QProcess>
+#include<QObject>
+#include <QTcpSocket>
 
-class WifiScannerTask {
+class WifiScannerTask :public QObject{
+    Q_OBJECT
 public:
-    // 构造函数声明
-    explicit WifiScannerTask(const QString& ip, quint16 startPort, quint16 endPort);
-    explicit WifiScannerTask(const QString& ip);  // 默认扫描构造函数
+    explicit WifiScannerTask(const QString& ip,quint16 port);
+    explicit WifiScannerTask(const QString& ip);
+    ~WifiScannerTask();
+    void run();  // 执行扫描
 
-    QPair<QString, quint16> run();  // 执行扫描
-    bool isPortOpen(const QString& ip, quint16 port, int timeoutMs);
 private:
-    bool isAdbService(const QString& ip, quint16 port);  // 判断是否为 ADB
+    void initSignals();
+
+public slots:
+    void onErrorOccurred(QAbstractSocket::SocketError socketError);
+    void onConnected();
+
+signals:
+    void deviceFound(const QString &ip, quint16 port);  // 设备发现的信号
+
+private:
     QString ip;
-    quint16 startPort;
-    quint16 endPort;
-    QProcess* process;  // 将 QProcess 放在成员中
+    quint16 port;
+    QTcpSocket* socket;
 };
 
 #endif // WIFISCANNERTASK_H

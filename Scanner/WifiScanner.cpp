@@ -6,42 +6,54 @@
 
 
 WifiScanner::WifiScanner(const QString& startIp, const QString& endIp, quint16 startPort, quint16 endPort)
-:startIp(startIp), endIp(endIp), startPort(startPort), endPort(endPort) {
-    threadPool = new QThreadPool(this);
-    threadPool->setMaxThreadCount(4);  // 设置最大线程数为 4
+    :startIp(startIp), endIp(endIp), startPort(startPort),
+    endPort(endPort),threadPool(new QThreadPool())
+{
+    futures.clear();
 }
 
-WifiScanner::WifiScanner() {
-    threadPool = new QThreadPool(this);
-    threadPool->setMaxThreadCount(4);  // 设置最大线程数为 4
+WifiScanner::WifiScanner():threadPool(new QThreadPool()) {
+    futures.clear();
+}
+
+WifiScanner::~WifiScanner()
+{
+
 }
 
 void WifiScanner::startScanning() {
 
-    if (!validateAndStartScan(startIp, endIp, startPort, endPort)) {
-        qDebug() << "Scan aborted due to invalid parameters.";
-        return;  // 参数无效，返回
-    }
+    currentDevices.clear();
+
+    threadPool->setMaxThreadCount(6);
 
     quint32 start = QHostAddress(startIp).toIPv4Address();
     quint32 end = QHostAddress(endIp).toIPv4Address();
-  //  QProcess* process = new QProcess();
+
     for (quint32 ip = start; ip <= end; ++ip) {
         QString ipStr = QHostAddress(ip).toString();
-        QtConcurrent::run([this, ipStr]() -> QPair<QString, quint16> {
-            WifiScannerTask task(ipStr, startPort, endPort);
-            QPair<QString, quint16> result = task.run();
-            return result;  // 返回扫描结果
-            }).then([this](QPair<QString, quint16> result) {
-                if (!result.first.isEmpty()) {
-                    this->handleDeviceFound(result.first, result.second);
-                }
-                else {
-                    //将不符合的ipStr,port加入列表，不在扫描
-                }
-                });
+        if (!scannedAddresses.contains(ipStr)) {
+            scannedAddresses.insert(ipStr);
+
+            QFuture<void> future=QtConcurrent::run([this,ipStr]() {
+
+                WifiScannerTask *task = new WifiScannerTask(ipStr);  // 使用堆对象(ipStr);  //默认都是5555 QueuedConnection
+                connect(task,&WifiScannerTask::deviceFound,this,&WifiScanner::handleDeviceFound,Qt::DirectConnection);
+                task->run();
+                delete task;
+            });
+            futures.append(future);  // 将每个任务的QFuture添加到列表中
+        }
     }
+
+    for (auto& future : futures) {
+        future.waitForFinished();  // 阻塞直到任务完成
+    }
+
+    qDebug()<<"本次任务完成";
+    emit scanningFinished(currentDevices);
 }
+
 
 void WifiScanner::setWifiScanner(const QString& startIp, const QString& endIp, quint16 startPort, quint16 endPort)
 {
@@ -52,34 +64,13 @@ void WifiScanner::setWifiScanner(const QString& startIp, const QString& endIp, q
 }
 
 void WifiScanner::handleDeviceFound(const QString& ip, quint16 port) {
-    qDebug() << "设备发现，IP:" << ip << ", 端口:" << port;
-    emit DeviceFound(ip, port);  // 转发设备信息
+
+    qDebug() << "scanner组织结构:" << ip << ", 端口:" << port;
+    ConnectInfo info;
+    info.deviceType=DeviceType::WiFi;
+    info.port=port;
+    info.ipAddress=ip;
+    currentDevices.insert(info);
 }
 
 
-bool WifiScanner::isValidIp(const QString& ip) {
-    QHostAddress address(ip);
-    return address.protocol() != QAbstractSocket::UnknownNetworkLayerProtocol;
-}
-
-bool WifiScanner::isValidPort(quint16 port) {
-    return port >= 1 && port <= 65535;
-}
-
-bool WifiScanner::validateAndStartScan(const QString& startIp, const QString& endIp, quint16 startPort, quint16 endPort) {
-    // 检查 startIp 和 endIp 是否有效
-    if (!isValidIp(startIp) || !isValidIp(endIp)) {
-        qDebug() << "Invalid IP address.";
-        return false;
-    }
-
-    // 检查端口范围是否有效
-    if (!isValidPort(startPort) || !isValidPort(endPort)) {
-        qDebug() << "Invalid port range.";
-        return false;
-    }
-
-    // 如果所有条件都有效，执行扫描
-    qDebug() << "Starting scan...";
-    return true;
-}

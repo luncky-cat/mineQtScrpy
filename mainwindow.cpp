@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "showlayout.h"
+#include "Manager/androidmanager.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -13,7 +14,6 @@ MainWindow::MainWindow(QWidget *parent)
     QVBoxLayout * layout=new QVBoxLayout();
     layout->addWidget(show);
     ui->centralwidget->setLayout(layout);
-    //setLayout(layout);
     manger = new androidManager();
     manger->listen();
 }

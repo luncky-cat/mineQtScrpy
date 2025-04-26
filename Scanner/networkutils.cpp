@@ -13,7 +13,7 @@ netWorkUtils::WifiInfo netWorkUtils::activeWifiInterface() {
     // 遍历所有接口
     for (const QNetworkInterface &interface : interfaces) {
         // 打印接口名称
-        qDebug() << "Interface name:" << interface.humanReadableName();
+        //qDebug() << "Interface name:" << interface.humanReadableName();
         if (interface.flags() & QNetworkInterface::IsUp &&interface.flags() & QNetworkInterface::IsRunning) {
             if (interface.humanReadableName().contains("WLAN", Qt::CaseInsensitive)) {
                 qDebug() << "Found active Wi-Fi interface:" << interface.humanReadableName();
@@ -21,8 +21,8 @@ netWorkUtils::WifiInfo netWorkUtils::activeWifiInterface() {
                 QList<QNetworkAddressEntry> entries = interface.addressEntries();
                 for (const QNetworkAddressEntry &entry : entries) {
                     if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
-                        qDebug() << "IP Address:" << entry.ip().toString();
-                        qDebug() << "Netmask:" << entry.netmask().toString();
+                        //qDebug() << "IP Address:" << entry.ip().toString();
+                        //qDebug() << "Netmask:" << entry.netmask().toString();
                         //activeWifi=WifiInfo{entry.ip().toString(),entry.netmask().toString()};
                         return WifiInfo{entry.ip().toString(), entry.netmask().toString()};
                     }
@@ -57,10 +57,7 @@ bool netWorkUtils::getIpRange(const QString &ip, const QString &netmask, QString
 
     quint32 startIpInt = networkAddrInt + 1;
     quint32 endIpInt = broadcastAddrInt - 1;
-
     startIp = QHostAddress(startIpInt).toString();
     endIp = QHostAddress(endIpInt).toString();
-    qDebug() << "Start IP:" << startIp;
-    qDebug() << "End IP:" << endIp;
     return true;
 }
