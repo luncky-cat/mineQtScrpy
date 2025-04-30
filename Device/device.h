@@ -1,12 +1,11 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include "DeviceInfo.h"
+// #include "DeviceInfo.h"
 
 #include<QObject>
 #include <QString>
 #include <QVariant>
-
 #include <QDebug>
 
 class Device : public QObject {
@@ -44,7 +43,7 @@ signals:
     void streamingStopped();    // 推流停止信号
     void deviceRebooted();      // 设备重启信号
 private:
-    DeviceInfo info;
+    //DeviceInfo info;
 };
 
 
