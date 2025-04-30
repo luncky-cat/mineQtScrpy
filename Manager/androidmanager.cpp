@@ -3,8 +3,9 @@
 #include "AddDeviceWorker.h"            // 假设你分到单独头文件
 #include "RemoveDeviceWorker.h"         // 同上
 #include "Scanner/listenDevice.h"
+//#include "adbServer/adbserver.h"
 
-#include<qDebug>
+//#include<qDebug>
 
 androidManager::androidManager()
     :addWorker(new AddDeviceWorker(addQueue, addMutex,addCondition)),
@@ -42,6 +43,7 @@ void androidManager::onDevicesAdded(const QSet<ConnectInfo>& DeviceChangeSet) {
         qDebug() << "新增设备:"<< device.serialNumber;  // 打印设备信息
     }
 
+
     //QMutexLocker locker(&addMutex); // 加锁共享数据
    // addQueue.unite(DeviceChangeSet);
    // addCondition.wakeOne();
@@ -59,8 +61,8 @@ void androidManager::onDevicesRemoved(const QSet<ConnectInfo>& DeviceChangeSet)
 }
 
 void androidManager::handleDeviceAdded(const ConnectInfo& device) {
-
-
+    //=adb->connect();
+    //将信息拿去实例化devicec类
 }
 
 void androidManager::handleDeviceRemoved(const ConnectInfo& device) {

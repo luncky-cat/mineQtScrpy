@@ -13,6 +13,8 @@
 #include <QList>
 #include <QSet>
 
+#include <adbServer/adbserver.h>
+
 class AddDeviceWorker;    // 前向声明新增设备处理线程类
 class RemoveDeviceWorker; // 前向声明移除设备处理线程类
 
@@ -42,6 +44,7 @@ public:
     void selectDevice();
     void listen();  // 监听设备变化
 private:
+    //AdbServer* adb;
     AddDeviceWorker* addWorker;
     RemoveDeviceWorker* removeWorker;
     QList<Device*> devices;  // 当前设备列表
