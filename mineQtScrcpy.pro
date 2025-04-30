@@ -16,13 +16,14 @@ CONFIG += c++17
 INCLUDEPATH+=$$PWD/include
 LIBS+=$$PWD/dll/libcrypto.dll
 LIBS+=$$PWD/dll/libssl.dll
+# LIBS += -lws2_32
+
 
 # 在.pro文件中定义宏
 
 
 
 SOURCES += \
-    AdbCryptoUtils.cpp \
     Manager/AddDeviceWorker.cpp \
     Manager/RemoveDeviceWorker.cpp \
     Manager/androidmanager.cpp \
@@ -32,14 +33,20 @@ SOURCES += \
     Scanner/listenusb.cpp \
     Scanner/listenwifi.cpp \
     Scanner/networkutils.cpp \
+    adbServer/AdbCryptoUtils.cpp \
+    adbServer/adbprotocol.cpp \
+    adbServer/adbserver.cpp \
+    adbServer/adbstate.cpp \
     main.cpp \
     mainwindow.cpp \
     phoneshow.cpp \
     showlayout.cpp \
 
 HEADERS += \
-    AdbCryptoUtils.h \
+    Device/ConnectInfo.h \
+    Device/DeviceContext.h \
     Device/DeviceInfo.h \
+    Device/StreamStatus.h \
     Device/device.h \
     Manager/AddDeviceWorker.h \
     Manager/RemoveDeviceWorker.h \
@@ -52,6 +59,10 @@ HEADERS += \
     Scanner/listenusb.h \
     Scanner/listenwifi.h \
     Scanner/networkutils.h \
+    adbServer/AdbCryptoUtils.h \
+    adbServer/adbprotocol.h \
+    adbServer/adbserver.h \
+    adbServer/adbstate.h \
     androidmanager.h \
     log.h \
     mainwindow.h \
