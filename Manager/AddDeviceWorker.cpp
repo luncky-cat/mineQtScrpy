@@ -19,10 +19,9 @@ void AddDeviceWorker::run() {
         queue.clear();
         locker.unlock();
 
-        for (const auto& device : toProcess) {
-            qDebug() << "处理新增设备:";
-            emit deviceReadyToAdd(device);
-        }
+
+        qDebug() << "处理新增设备:";
+        emit deviceReadyToAdd(toProcess);
     }
 }
 

@@ -16,7 +16,7 @@ public:
 protected:
     void run() override;
 signals:
-    void deviceReadyToAdd(const ConnectInfo& device);
+    void deviceReadyToAdd(QSet<ConnectInfo> device);
 private:
     QSet<ConnectInfo>& queue;
     QMutex& mutex;

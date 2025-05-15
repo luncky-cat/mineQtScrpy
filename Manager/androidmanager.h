@@ -13,7 +13,7 @@
 #include <QList>
 #include <QSet>
 
-#include <adbServer/adbserver.h>
+#include <adbServer/AdbServer.h>
 
 class AddDeviceWorker;    // 前向声明新增设备处理线程类
 class RemoveDeviceWorker; // 前向声明移除设备处理线程类
@@ -31,11 +31,7 @@ private:
 public slots:
     void onDevicesAdded(const QSet<ConnectInfo>& DeviceChangeSet);
     void onDevicesRemoved(const QSet<ConnectInfo>& DeviceChangeSet);
-    void handleDeviceAdded(const ConnectInfo& device);
-    void handleDeviceRemoved(const ConnectInfo& device);
 public:
-    void processAddQueue();
-    void processRemoveQueue();
     void getDevices();
     void closeDevices();
     void allDescription();
@@ -44,14 +40,9 @@ public:
     void selectDevice();
     void listen();  // 监听设备变化
 private:
-    //AdbServer* adb;
-    AddDeviceWorker* addWorker;
-    RemoveDeviceWorker* removeWorker;
     QList<Device*> devices;  // 当前设备列表
+    QMap<QString,DeviceInfo>deviceInfos;   //设备信息详情列表
     QProcess* process;
-    QMutex addMutex, removeMutex;
-    QWaitCondition addCondition, removeCondition;
-    QSet<ConnectInfo> addQueue, removeQueue;  // 需要 DeviceInfo 完整定义，故 .cpp 中 include
 };
 
 #endif // ANDROIDMANAGER_H

@@ -1,29 +1,29 @@
 #include "androidmanager.h"
 
-#include "AddDeviceWorker.h"            // 假设你分到单独头文件
-#include "RemoveDeviceWorker.h"         // 同上
+/*#include "AddDeviceWorker.h"            // 假设你分到单独头文件
+#include "RemoveDeviceWorker.h"  */       // 同上
 #include "Scanner/listenDevice.h"
-//#include "adbServer/adbserver.h"
+#include "adbServer/AdbServer.h"
 
 //#include<qDebug>
 
-androidManager::androidManager()
-    :addWorker(new AddDeviceWorker(addQueue, addMutex,addCondition)),
-    removeWorker(new RemoveDeviceWorker(removeQueue, removeMutex,removeCondition)),
+androidManager::androidManager():
+    // :addWorker(new AddDeviceWorker(addQueue, addMutex,addCondition)),
+    //removeWorker(new RemoveDeviceWorker(removeQueue, removeMutex,removeCondition)),
     process(new QProcess())
 {
     devices.clear();
     signalConnect();
-    addWorker->start();
-    removeWorker->start();
+    //addWorker->start();
+    // removeWorker->start();
 }
 
 void androidManager::signalConnect()
 {
-    connect(addWorker,&AddDeviceWorker::deviceReadyToAdd, this,&androidManager::handleDeviceAdded);
-    connect(removeWorker, &RemoveDeviceWorker::deviceReadyToRemove, this, &androidManager::handleDeviceRemoved);
+    //connect(addWorker,&AddDeviceWorker::deviceReadyToAdd, this,&androidManager::handleDeviceAdded);
+    // connect(removeWorker, &RemoveDeviceWorker::deviceReadyToRemove, this, &androidManager::handleDeviceRemoved);
 
-    qDebug() << "正确";
+    //qDebug() << "正确";
 
     QList<ListenDevice*> listeners = ListenDevice::getListeners();
     for (ListenDevice* listener : listeners) {
@@ -39,37 +39,45 @@ androidManager::~androidManager() {
 
 
 void androidManager::onDevicesAdded(const QSet<ConnectInfo>& DeviceChangeSet) {
-    for (const ConnectInfo& device : DeviceChangeSet) {
-        qDebug() << "新增设备:"<< device.serialNumber;  // 打印设备信息
+
+    qDebug()<<"androidManager新增";
+    for (const ConnectInfo& device : DeviceChangeSet) {   //假设只有wifi设备的情况
+        if(device.ConnectType==ConnectType::WiFi){
+            qDebug() << "新增设备:"<< device.ipAddress;  // 打印设备信息
+        }
     }
 
 
-    //QMutexLocker locker(&addMutex); // 加锁共享数据
-   // addQueue.unite(DeviceChangeSet);
-   // addCondition.wakeOne();
+    if (DeviceChangeSet.isEmpty()) {
+        qDebug() << "No device info to process.";
+        return;
+    }
+
+    for(auto info:DeviceChangeSet){
+        AdbServer::getInstance().registerDevice(info);
+    }
+
+    AdbServer::getInstance().getRegisteredDevices();
+
+    //渲染到ui中，这些可连接设备
+
+    for(auto info:DeviceChangeSet){   //调试输出
+        bool sull=AdbServer::getInstance().connectDevice(info.deviceId.toStdString());
+    }
+
+
 }
 
 void androidManager::onDevicesRemoved(const QSet<ConnectInfo>& DeviceChangeSet)
 {
+    qDebug()<<"androidManager移除";
     for (const ConnectInfo& device : DeviceChangeSet) {
-       qDebug() << "移除设备:"<< device.serialNumber;  // 打印设备信息
+        qDebug() << "移除设备:"<< device.serialNumber;  // 打印设备信息
     }
 
-    //QMutexLocker locker(&removeMutex); // 加锁共享数据
-  //  removeQueue.unite(DeviceChangeSet);
-    //removeCondition.wakeOne();
-}
 
-void androidManager::handleDeviceAdded(const ConnectInfo& device) {
-    //=adb->connect();
-    //将信息拿去实例化devicec类
-}
-
-void androidManager::handleDeviceRemoved(const ConnectInfo& device) {
 
 }
-
-
 
 void androidManager::getDevices()
 {
@@ -98,6 +106,7 @@ void androidManager::description()
 
 void androidManager::selectDevice()
 {
+
 
 }
 
