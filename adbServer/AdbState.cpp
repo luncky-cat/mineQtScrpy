@@ -1,65 +1,54 @@
-#include "adbstate.h"
-#include "adbserver.h"
+#include "AdbState.h"
+#include "Device/DeviceContext.h"
 
-//连接：获得数据-调用连接函数
-void ConnectingState::handle(AdbServer &server,DeviceContext &context)
+#include<QDebug>
+
+bool ConnectingState::handle(DeviceContext& context)
 {
-    ConnectInfo& info=context.connectInfo;
-    context.socket=server.connect(info);   //获得socket
-    if( context.socket!=-1){   //转化为认证状态
-        server.setState(context.deviceId,std::make_unique<AuthenticatingState>());  //转化为认证状态
+    qDebug()<<"进入连接态";
+    bool successful=context.strategy->connect(context);
+    if(successful){
+        qDebug()<<"连接成功";
+        setState(context,std::make_unique<AuthenticatingState>());
     }else{
-        server.setState(context.deviceId,std::make_unique<DisconnectedState>());  //转化为认证状态
+        qDebug()<<"连接失败，保持断开";
     }
+    return successful;
 }
 
 //认证
-void AuthenticatingState::handle(AdbServer& server,DeviceContext &context) {    //后续扩展成usb认证
-    // authWiFi
-    SOCKET sock=context.socket;
-    bool result=server.authWiFi(sock);
-    if(result){   //执行态
-        server.setState(context.deviceId,std::make_unique<ConnectedState>());  //转化为执行态
-    }else{    //断开态
-        server.setState(context.deviceId,std::make_unique<DisconnectedState>());  //转化为认证状态
+bool AuthenticatingState::handle(DeviceContext& context) {
+    qDebug()<<"进入认证态";
+    bool successful=context.strategy->auth(context);
+    if(successful){
+        qDebug()<<"认证成功";
+        setState(context,std::make_unique<ExecutingState>());
+    }else{
+        qDebug()<<"认证失败,返回连接态重试";
+        setState(context,std::make_unique<ConnectingState>());
     }
+    return successful;
 }
 
 //执行
-void ConnectedState::handle(AdbServer& server,DeviceContext&context) {
-    // 设备断开连接或需要关闭连接时的操作
-
-    //执行
-
-    //接收
-
-}
-
-void DisconnectedState::handle(AdbServer& server, DeviceContext &context) {
-
-
-
+bool ExecutingState::handle(DeviceContext& context) {
+    qDebug()<<"进入执行态";
+    bool successful=context.strategy->execute(context);
+    if(!successful){  //执行失败
+        qDebug()<<"执行失败";
+        setState(context,std::make_unique<DisconnectedState>());
+    }
+    return successful;
 }
 
 
-DeviceStatus ConnectingState::getStatus()
+bool DisconnectedState::handle(DeviceContext& context) {
+    bool successful=context.strategy->close(context);
+    return successful;
+}
+
+void IAdbState::setState(DeviceContext &context, std::unique_ptr<IAdbState> newState)
 {
-    return DeviceStatus::Connecting;
+    context.currentState = std::move(newState);
+    context.currentState->handle(context);    //自动调用默认行为
 }
-
-DeviceStatus AuthenticatingState::getStatus()
-{
-
-    return DeviceStatus::Authenticating;
-}
-
-DeviceStatus ConnectedState::getStatus()
-{
-    return DeviceStatus::Connected;
-}
-
-DeviceStatus DisconnectedState::getStatus()
-{
-    return DeviceStatus::Disconnected;
-}
-

@@ -1,30 +1,24 @@
 #ifndef ADBSTATE_H
 #define ADBSTATE_H
 
-enum class DeviceStatus {
-    Disconnected,
-    Connecting,
-    Authenticating,
-    Connected
-};
+#include <memory>
+
 
 struct DeviceContext;
-
-class AdbServer;
 
 class IAdbState {
 public:
     virtual ~IAdbState() = default;
-    virtual DeviceStatus getStatus()=0;
-    virtual void handle(AdbServer& server,DeviceContext& context) = 0;
+    virtual bool handle(DeviceContext& context) = 0;
+protected:
+    void setState(DeviceContext& context, std::unique_ptr<IAdbState> newState);
 };
 
 // 连接状态
 class ConnectingState : public IAdbState {
 public:
     ConnectingState()=default;
-    void handle(AdbServer& server,DeviceContext& context) override;
-    DeviceStatus getStatus() override;
+    bool handle(DeviceContext& context) override;
     ~ConnectingState()=default;
 };
 
@@ -32,26 +26,23 @@ public:
 class AuthenticatingState : public IAdbState {
 public:
     AuthenticatingState()=default;
-    void handle(AdbServer& server,DeviceContext& context) override;
-    DeviceStatus getStatus() override;
+    bool handle(DeviceContext& context) override;
     ~AuthenticatingState()=default;
 };
 
 // 执行状态
-class ConnectedState : public IAdbState {
+class ExecutingState : public IAdbState {
 public:
-    ConnectedState()=default;
-    void handle(AdbServer& server,DeviceContext& context) override;
-    DeviceStatus getStatus() override;
-    ~ConnectedState()=default;
+    ExecutingState()=default;
+    bool handle(DeviceContext& context) override;
+    ~ExecutingState()=default;
 };
 
 // 断开状态
 class DisconnectedState : public IAdbState {
 public:
     DisconnectedState()=default;
-    void handle(AdbServer& server,DeviceContext& context) override;
-    DeviceStatus getStatus() override;
+    bool handle(DeviceContext& context) override;
     ~DisconnectedState()=default;
 };
 #endif // ADBSTATE_H
