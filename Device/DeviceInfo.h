@@ -8,7 +8,6 @@
 struct DeviceInfo {
     ConnectInfo connectInfo;
     StreamStatus streamStatus;
-
     QString network;      // 设备所属网络
     QString name;               // 可选的设备名称，便于在UI中展示
     QString model;              // 设备型号（可选，可通过 adb 获取）
