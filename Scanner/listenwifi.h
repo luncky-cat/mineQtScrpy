@@ -19,7 +19,7 @@ public:
     void stopListening() override;
 
 public slots:
-    void scanDevices() override;  //实际扫描
+    void scanDevices();  //实际扫描
     void onScanningFinished(QSet<ConnectInfo>& currentDevices);   //发送);   //扫描结束
     void handleDeviceFound(const QString& ip, int port);
 
@@ -28,10 +28,10 @@ private:
     QScopedPointer<QTimer> timer;
     WifiScanner* scanner;
     static ListenWifi instance;  // 静态实例，确保在程序启动时创建
+    bool isListen;
 };
 
 #endif // LISTENWIFI_H
-
 
 /*
 动态调整线程数：可以根据系统的负载情况动态调整线程池的最大线程数。例如，在低负载时增加并发数，而在高负载时减少并发数。

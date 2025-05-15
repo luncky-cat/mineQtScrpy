@@ -18,7 +18,7 @@ ListenWifi::ListenWifi():interval(5000),timer(new QTimer()),scanner(new WifiScan
 void ListenWifi::initSignals()
 {
     connect(timer.get(), &QTimer::timeout, this, &ListenWifi::scanDevices);
-   // connect(scanner, &WifiScanner::DeviceFound, this, &ListenWifi::handleDeviceFound);
+    //connect(scanner, &WifiScanner::DeviceFound, this, &ListenWifi::handleDeviceFound);
     connect(scanner, &WifiScanner::scanningFinished, this, &ListenWifi::onScanningFinished);
 }
 
@@ -44,7 +44,8 @@ void ListenWifi::scanDevices()
     QString startIp, endIp;
     netWorkUtils::getIpRange(wifi.ip, wifi.netmask, startIp, endIp);   //计算ip范围
     qDebug() << startIp << "" << endIp;
-    scanner->setWifiScanner(startIp,"192.168.1.20",5555,5555);  //设置默认5555端口
+    //scanner->setWifiScanner(startIp,endIp,5555,5555);  //设置默认5555端口
+    scanner->setWifiScanner("192.168.1.2","192.168.1.20",5555,5555);
     scanner->startScanning();
 }
 
