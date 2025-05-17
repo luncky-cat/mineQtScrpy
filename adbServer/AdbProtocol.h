@@ -3,6 +3,7 @@
 
 #include "AdbMessage.h"
 
+#include <optional>
 #include <string>
 
 class AdbProtocol {
@@ -30,8 +31,10 @@ public:
     static std::vector<uint8_t> generateWrite(int localId, int remoteId, const std::vector<uint8_t>& data);
     static std::vector<uint8_t> generateClose(int localId, int remoteId);
     static std::vector<uint8_t> generateReady(int localId, int remoteId);
-    static AdbMessage parseAdbMessage(std::vector<uint8_t>& data);
+    //static AdbMessage parseAdbMessage(std::vector<uint8_t>& data);
     static void printAdbMessage(const AdbMessage& msg);
+   // static std::optional<AdbMessage> parseAdbMessage(std::vector<uint8_t> &data);
+    static std::optional<AdbMessage> parseAdbMessage(const std::vector<uint8_t> &buffer, size_t &outMessageLength);
 };
 
 #endif // AdbProtocol_H

@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
+#include <optional>
 
 const unsigned AdbProtocol::ADB_HEADER_LENGTH = 24;
 const unsigned AdbProtocol::CMD_SYNC = 0x434e5953;
@@ -80,16 +81,21 @@ std::vector<uint8_t> AdbProtocol::generateReady(int localId, int remoteId) {
     return generateMessage(CMD_OKAY, localId, remoteId, {});
 }
 
-AdbMessage AdbProtocol::parseAdbMessage(std::vector<uint8_t>& data) {
-    if (data.size() < ADB_HEADER_LENGTH) {
-        throw std::runtime_error("Data too short to be a valid ADB message");
+std::optional<AdbMessage> AdbProtocol::parseAdbMessage(const std::vector<uint8_t>& buffer, size_t& outMessageLength) {
+    //constexpr size_t ADB_HEADER_LENGTH = 24;
+
+    if (buffer.size() < ADB_HEADER_LENGTH) {
+        return std::nullopt;  // 数据太少，等更多
     }
 
-    AdbMessage msg;
-    auto extract = [&](int offset) -> unsigned {
-        return data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+    auto extract = [&](int offset) -> uint32_t {
+        return buffer[offset] |
+               (buffer[offset + 1] << 8) |
+               (buffer[offset + 2] << 16) |
+               (buffer[offset + 3] << 24);
     };
 
+    AdbMessage msg;
     msg.command = extract(0);
     msg.arg0 = extract(4);
     msg.arg1 = extract(8);
@@ -97,12 +103,21 @@ AdbMessage AdbProtocol::parseAdbMessage(std::vector<uint8_t>& data) {
     msg.checksum = extract(16);
     msg.magic = extract(20);
 
+    outMessageLength = ADB_HEADER_LENGTH + msg.payloadLength;
+
+    // 数据不够一个完整包
+    if (buffer.size() < outMessageLength) {
+        return std::nullopt;
+    }
+
     if (msg.payloadLength > 0) {
-        msg.payload.assign(data.begin() + ADB_HEADER_LENGTH, data.begin() + ADB_HEADER_LENGTH + msg.payloadLength);
+        msg.payload.assign(buffer.begin() + ADB_HEADER_LENGTH,
+                           buffer.begin() + ADB_HEADER_LENGTH + msg.payloadLength);
     }
 
     return msg;
 }
+
 
 void AdbProtocol::printAdbMessage(const AdbMessage& msg) {
     std::cout << "Command: 0x" << std::hex << std::setw(8) << std::setfill('0') << msg.command << std::dec << std::endl;
