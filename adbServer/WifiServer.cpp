@@ -16,6 +16,71 @@
 #include <QThread>
 
 
+namespace AdbSyncProtocol {
+
+constexpr uint32_t SYNC_SEND = ('S') | ('E' << 8) | ('N' << 16) | ('D' << 24);
+constexpr uint32_t SYNC_DATA = ('D') | ('A' << 8) | ('T' << 16) | ('A' << 24);
+constexpr uint32_t SYNC_DONE = ('D') | ('O' << 8) | ('N' << 16) | ('E' << 24);
+
+/// 构造 SEND 命令 payload
+std::vector<uint8_t> generateSEND(const std::string& remotePathWithMode) {
+    std::vector<uint8_t> payload;
+    uint32_t pathLen = static_cast<uint32_t>(remotePathWithMode.size());
+
+    // 构造 SEND header (command + path length)
+    payload.push_back('S'); payload.push_back('E');
+    payload.push_back('N'); payload.push_back('D');
+
+    payload.push_back(pathLen & 0xFF);
+    payload.push_back((pathLen >> 8) & 0xFF);
+    payload.push_back((pathLen >> 16) & 0xFF);
+    payload.push_back((pathLen >> 24) & 0xFF);
+
+    // 添加路径和权限（如 "/data/local/tmp/test.txt,33206"）
+    payload.insert(payload.end(), remotePathWithMode.begin(), remotePathWithMode.end());
+
+    return payload;
+}
+
+/// 构造 DATA 块 payload（每块最大 64K）
+std::vector<uint8_t> generateDATA(const std::vector<uint8_t>& buf, size_t len) {
+    std::vector<uint8_t> payload;
+
+    // 写入 "DATA" 标识
+    payload.push_back('D'); payload.push_back('A');
+    payload.push_back('T'); payload.push_back('A');
+
+    // 写入数据长度
+    payload.push_back(len & 0xFF);
+    payload.push_back((len >> 8) & 0xFF);
+    payload.push_back((len >> 16) & 0xFF);
+    payload.push_back((len >> 24) & 0xFF);
+
+    // 附加实际文件内容
+    payload.insert(payload.end(), buf.begin(), buf.begin() + len);
+
+    return payload;
+}
+
+/// 构造 DONE payload（mtime 为最后修改时间）
+std::vector<uint8_t> generateDONE(uint32_t mtime) {
+    std::vector<uint8_t> payload;
+
+    payload.push_back('D'); payload.push_back('O');
+    payload.push_back('N'); payload.push_back('E');
+
+    payload.push_back(mtime & 0xFF);
+    payload.push_back((mtime >> 8) & 0xFF);
+    payload.push_back((mtime >> 16) & 0xFF);
+    payload.push_back((mtime >> 24) & 0xFF);
+
+    return payload;
+}
+
+}
+
+
+
 bool WifiServer::sendMsg(std::vector<uint8_t>& sendMsg, DeviceContext& ctx) {
     int sendLen = send(ctx.socket, reinterpret_cast<const char*>(sendMsg.data()), sendMsg.size(), 0);
     return sendLen >= 0;
@@ -392,6 +457,12 @@ bool WifiServer::openSyncChannel(DeviceContext &ctx)   //打开流服务，将�
 // }
 
 bool WifiServer::executeShell(std::string &cmd,DeviceContext &ctx){
+
+    if(!openShellChannel(ctx)){
+        qDebug()<<"打开流失败";
+        return false;
+    }
+
     std::vector<std::string> wrtePayloads;
     std::string shellPromptSuffix = "/ $ ";  // 更通用的 shell 提示符
 
@@ -445,25 +516,70 @@ bool WifiServer::executeShell(std::string &cmd,DeviceContext &ctx){
 
 bool WifiServer::execute(DeviceContext &ctx)    //后续解耦
 {
-    if(!openShellChannel(ctx)){
-        qDebug()<<"打开流失败";
+    // if(!openShellChannel(ctx)){
+    //     qDebug()<<"打开流失败";
+    //     return false;
+    // }
+
+    std::string cmd = "getprop ro.serialno\n";
+    // executeShell(cmd,ctx);
+
+    cmd = "ls /data/local/tmp\n";
+    executeShell(cmd,ctx);
+
+    // cmd = "ls\n";
+    // executeShell(cmd,ctx);
+
+    // cmd = "date\n";
+    // executeShell(cmd,ctx);
+
+
+    // cmd = "whoami\n";
+    // executeShell(cmd,ctx);
+
+    auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
+    ctx.local_id = local_id;
+    sendMsg(openSync, ctx);
+    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
+        qDebug() << "未收到ok";
+        return false;
+    }
+    ctx.remote_id = msg.arg0;
+
+    //SEND
+
+    std::string remotePath = "/data/local/tmp/CMakeLists.txt,33206"; // 第二个参数是权限
+    std::vector<uint8_t> sendPayload =AdbSyncProtocol::generateSEND(remotePath);
+    auto sMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id,sendPayload);
+    sendMsg(sMsg,ctx);
+    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
+        qDebug() << "未收到ok";
         return false;
     }
 
-    std::string cmd = "getprop ro.serialno\n";
-    executeShell(cmd,ctx);
+    std::ifstream file("D:/Documents/mineQtScrcpy/CMakeLists.txt", std::ios::binary);
+    const size_t blockSize = 64 * 1024;
+    std::vector<uint8_t> buffer(blockSize);  // 这一行是定义 buffer 的地方
+    while (file.read((char*)buffer.data(), blockSize) || file.gcount() > 0) {
+        auto dataPayload = AdbSyncProtocol::generateDATA(buffer, file.gcount());
+        auto writeMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
+        sendMsg(writeMsg, ctx);
+        waitForCommand(ctx, AdbProtocol::CMD_OKAY);
+    }
+
+    uint32_t mtime = static_cast<uint32_t>(std::time(nullptr));
+    auto donePayload = AdbSyncProtocol::generateDONE(mtime);
+    auto doneMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, donePayload);
+    sendMsg(doneMsg, ctx);
+    waitForCommand(ctx, AdbProtocol::CMD_OKAY);
 
 
 
-    cmd = "ls\n";
-    executeShell(cmd,ctx);
-
-    cmd = "date\n";
-    executeShell(cmd,ctx);
 
 
-    cmd = "whoami\n";
-    executeShell(cmd,ctx);
+    // auto closeMsg = AdbProtocol::generateClose(ctx.local_id, ctx.remote_id);
+    // sendMsg(closeMsg, ctx);
+
 
     // std::vector<std::string> wrtePayloads;
     // std::string shellPromptSuffix = "/ $ ";  // 更通用的 shell 提示符
