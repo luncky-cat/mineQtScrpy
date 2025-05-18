@@ -2,58 +2,72 @@
 #define ADBSERVER_H
 
 #include "Device/DeviceContext.h"
+#include "DeviceServerFactory.hpp"
 
 #include <winsock2.h>
 #include <string>
-#include<vector>
+#include <vector>
 #include <unordered_map>
+#include <memory>
+
+
+// threadPool.submit([=]() {
+//     this->handleDeviceConnection(clientSocket);
+// });
+
 
 class AdbServer {
-
 public:
+    static AdbServer& getInstance();
+    ~AdbServer();
 
-    AdbServer() = default;
+    void asyncConnectDevice(const std::string& deviceId);
+    void doConnectDevice(const std::string& deviceId);
 
-    ~AdbServer() = default;
+    // 设备管理接口
+    bool registerDevice(const ConnectInfo& info);  // 注册设备信息
+    bool unregisterDevice(const std::string& deviceId);  // 注销设备
+    std::vector<std::string> getRegisteredDevices() const;  // 获取已注册设备列表
 
-    bool connect(const std::string& deviceId);   //   连接某个设备
+    // 设备操作接口
+    bool disconnectDevice(const std::string& deviceId);  // 断开设备
 
-    //更新某个数据源
-   // void updateDeviceInfo(const std::string& deviceId,const ConnectInfo& info);
+    // 设备状态查询接口
+    DeviceStatus getDeviceStatus(const std::string& deviceId) const;  // 获取设备状态
+    bool isDeviceConnected(const std::string& deviceId) const;  // 检查设备是否连接
 
-    void setDeviceInfos(const std::vector<ConnectInfo>& infos);  //设置信息源
 
-   // void executeCommand(const std::string& deviceId);
+
+    void start();
+    void handleClient(int clientSocket);
+    bool readMessage(int clientSocket, std::string& outCmd);
+    void processCommand(int clientSocket, const std::string& cmd);
+    void sendOkay(int clientSocket);
+    void sendFail(int clientSocket, const std::string& reason);
+    void sendPayload(int clientSocket, const std::string& data);
+    void acceptSocket();
+    bool readMessage1(int clientSocket, std::string &outMsg);
+private:
+         // AdbServer()=default;
+    AdbServer();
+    AdbServer(const AdbServer&) = delete;
+    AdbServer& operator=(const AdbServer&) = delete;
+
+    // 状态管理
+    bool setState(const std::string& deviceId, std::unique_ptr<IAdbState> newState);
+
+    // 设备上下文管理
+    DeviceContext* getDeviceContext(const std::string& deviceId);
+    const DeviceContext* getDeviceContext(const std::string& deviceId) const;
+
+    int ADB_PORT = 8091;
+    int BUFFER_SIZE = 4096;
+
+    int serverSocket;
 
 private:
-
-    int connect(const ConnectInfo& info);   //返回认证后得设备信息
-
-    bool initNetwork();
-
-    SOCKET connectWiFi(const ConnectInfo& info);   //连接
-
-    SOCKET connectDevice(const char *ip, int port);
-
-    bool authWiFi(const SOCKET& sock);  //认证
-
-  //  bool connectUSB(const ConnectInfo& info);
-
-private:
-
-   // ConnectInfo findInfoById(const std::string& deviceId);
-
-    bool setState(const std::string& deviceId, std::unique_ptr<IAdbState> newState);   //后续可以用枚举值
-
-private:
-
-    friend class ConnectingState;  // 允许其访问私有成员
-    friend class AuthenticatingState;
-    friend class ConnectedState;
-    friend class DisconnectedState;
-
     std::unordered_map<std::string, DeviceContext> deviceContextMap;
+    std::unique_ptr<DeviceServerFactory>fac;  //用于得到需要的服务
 };
-
 
 #endif // ADBSERVER_H
