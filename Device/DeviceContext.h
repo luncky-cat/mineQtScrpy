@@ -1,65 +1,45 @@
 #ifndef DEVICECONTEXT_H
 #define DEVICECONTEXT_H
 
+#include "AdbMessage.h"
 #include "AdbState.h"
+#include "CommandInfo.h"
 #include "ConnectInfo.h"
 #include "DeviceServer.h"
-#include <memory>
-#include<QTcpSocket>
 
+#include <map>
 
 enum class DeviceStatus {
     Disconnected,
     Connecting,
     Authenticating,
-    Connected
+    ExecutingState
 };
-
-// struct DeviceContext {
-// public:
-//     ConnectInfo connectInfo;   //连接信息
-//     DeviceStatus status; //状态
-//     DeviceServer *strategy; // 抽象策略接口
-//     std::unique_ptr<IAdbState> currentState;  //状态指针
-//     //连接态的信息及状态位
-//     bool networkInitialized;
-//     int socket = -1;  // 连接的句柄
-
-
-//     //执行态
-//     bool isOpenShell;
-//     QTcpSocket* test;
-
-//     void init(){
-
-//     }
-// };
-
 
 class DeviceContext {
 public:
     DeviceContext(DeviceServer* strategyPtr = nullptr)
-        : strategy(strategyPtr),
+        :strategy(strategyPtr),
         status(DeviceStatus::Disconnected),
-        networkInitialized(false),
         socket(-1),
-        isOpenShell(false),
-        test(nullptr),local_id(-1),remote_id(-1){}
+        isOpenShell(false),isOpenSync(false),
+        local_id(-1),remote_id(-1){}
     void setConnectInfo(ConnectInfo info){
         connectInfo=info;
     }
 public:
-    ConnectInfo connectInfo;
-    DeviceStatus status;
-    bool networkInitialized;
-    int socket;
-    bool isOpenShell;
-    DeviceServer* strategy;
-    QTcpSocket* test;
-    std::unique_ptr<IAdbState> currentState;
+    AdbMessage msg;
     int local_id;
     int remote_id;
-
+    ConnectInfo connectInfo;  //连接信息
+    CommandInfo cmd; //命令类型
+    DeviceStatus status;   //状态位
+    int socket;
+    std::map<std::string,std::string> deviceInfos;//认证成功返回的信息
+    bool isOpenShell;
+    bool isOpenSync;
+    DeviceServer* strategy;
+    std::unique_ptr<IAdbState> currentState;
 };
 
 
