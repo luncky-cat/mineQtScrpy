@@ -3,7 +3,7 @@
 
 #include<QDebug>
 
-bool ConnectingState::handle(DeviceContext& context)
+void ConnectingState::handle(DeviceContext& context)
 {
     qDebug()<<"进入连接态";
     bool successful=context.strategy->connect(context);
@@ -13,11 +13,10 @@ bool ConnectingState::handle(DeviceContext& context)
     }else{
         qDebug()<<"连接失败，保持断开";
     }
-    return successful;
 }
 
 //认证
-bool AuthenticatingState::handle(DeviceContext& context) {
+void AuthenticatingState::handle(DeviceContext& context) {
     qDebug()<<"进入认证态";
     bool successful=context.strategy->auth(context);
     if(successful){
@@ -27,24 +26,21 @@ bool AuthenticatingState::handle(DeviceContext& context) {
         qDebug()<<"认证失败,返回连接态重试";
         setState(context,std::make_unique<ConnectingState>());
     }
-    return successful;
 }
 
 //执行
-bool ExecutingState::handle(DeviceContext& context) {
+void ExecutingState::handle(DeviceContext& context) {
     qDebug()<<"进入执行态";
     bool successful=context.strategy->execute(context);
     if(!successful){  //执行失败
-        qDebug()<<"执行失败";
+        qDebug()<<"执行失败,进入断开态";
         setState(context,std::make_unique<DisconnectedState>());
     }
-    return successful;
 }
 
 
-bool DisconnectedState::handle(DeviceContext& context) {
-    bool successful=context.strategy->close(context);
-    return successful;
+void DisconnectedState::handle(DeviceContext& context) {
+    context.strategy->close(context);
 }
 
 void IAdbState::setState(DeviceContext &context, std::unique_ptr<IAdbState> newState)

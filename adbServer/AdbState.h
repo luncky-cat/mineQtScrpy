@@ -3,13 +3,12 @@
 
 #include <memory>
 
-
 struct DeviceContext;
 
 class IAdbState {
 public:
     virtual ~IAdbState() = default;
-    virtual bool handle(DeviceContext& context) = 0;
+    virtual void handle(DeviceContext& context) = 0;
 protected:
     void setState(DeviceContext& context, std::unique_ptr<IAdbState> newState);
 };
@@ -18,7 +17,7 @@ protected:
 class ConnectingState : public IAdbState {
 public:
     ConnectingState()=default;
-    bool handle(DeviceContext& context) override;
+    void handle(DeviceContext& context) override;
     ~ConnectingState()=default;
 };
 
@@ -26,7 +25,7 @@ public:
 class AuthenticatingState : public IAdbState {
 public:
     AuthenticatingState()=default;
-    bool handle(DeviceContext& context) override;
+    void handle(DeviceContext& context) override;
     ~AuthenticatingState()=default;
 };
 
@@ -34,7 +33,7 @@ public:
 class ExecutingState : public IAdbState {
 public:
     ExecutingState()=default;
-    bool handle(DeviceContext& context) override;
+    void handle(DeviceContext& context) override;
     ~ExecutingState()=default;
 };
 
@@ -42,7 +41,7 @@ public:
 class DisconnectedState : public IAdbState {
 public:
     DisconnectedState()=default;
-    bool handle(DeviceContext& context) override;
+    void handle(DeviceContext& context) override;
     ~DisconnectedState()=default;
 };
 #endif // ADBSTATE_H
