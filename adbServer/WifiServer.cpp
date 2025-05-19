@@ -16,105 +16,10 @@
 #include <QThread>
 
 
-namespace AdbSyncProtocol {
-
-constexpr uint32_t SYNC_SEND = ('S') | ('E' << 8) | ('N' << 16) | ('D' << 24);
-constexpr uint32_t SYNC_DATA = ('D') | ('A' << 8) | ('T' << 16) | ('A' << 24);
-constexpr uint32_t SYNC_DONE = ('D') | ('O' << 8) | ('N' << 16) | ('E' << 24);
-
-/// 构造 SEND 命令 payload
-std::vector<uint8_t> generateSEND(const std::string& remotePathWithMode) {
-    std::vector<uint8_t> payload;
-    uint32_t pathLen = static_cast<uint32_t>(remotePathWithMode.size());
-
-    // 构造 SEND header (command + path length)
-    payload.push_back('S'); payload.push_back('E');
-    payload.push_back('N'); payload.push_back('D');
-
-    payload.push_back(pathLen & 0xFF);
-    payload.push_back((pathLen >> 8) & 0xFF);
-    payload.push_back((pathLen >> 16) & 0xFF);
-    payload.push_back((pathLen >> 24) & 0xFF);
-
-    // 添加路径和权限（如 "/data/local/tmp/test.txt,33206"）
-    payload.insert(payload.end(), remotePathWithMode.begin(), remotePathWithMode.end());
-
-    return payload;
-}
-
-/// 构造 DATA 块 payload（每块最大 64K）
-std::vector<uint8_t> generateDATA(const std::vector<uint8_t>& buf, size_t len) {
-    std::vector<uint8_t> payload;
-
-    // 写入 "DATA" 标识
-    payload.push_back('D'); payload.push_back('A');
-    payload.push_back('T'); payload.push_back('A');
-
-    // 写入数据长度
-    payload.push_back(len & 0xFF);
-    payload.push_back((len >> 8) & 0xFF);
-    payload.push_back((len >> 16) & 0xFF);
-    payload.push_back((len >> 24) & 0xFF);
-
-    // 附加实际文件内容
-    payload.insert(payload.end(), buf.begin(), buf.begin() + len);
-
-    return payload;
-}
-
-/// 构造 DONE payload（mtime 为最后修改时间）
-std::vector<uint8_t> generateDONE(uint32_t mtime) {
-    std::vector<uint8_t> payload;
-
-    payload.push_back('D'); payload.push_back('O');
-    payload.push_back('N'); payload.push_back('E');
-
-    payload.push_back(mtime & 0xFF);
-    payload.push_back((mtime >> 8) & 0xFF);
-    payload.push_back((mtime >> 16) & 0xFF);
-    payload.push_back((mtime >> 24) & 0xFF);
-
-    return payload;
-}
-
-}
 
 
 
-bool WifiServer::sendMsg(std::vector<uint8_t>& sendMsg, DeviceContext& ctx) {
-    int sendLen = send(ctx.socket, reinterpret_cast<const char*>(sendMsg.data()), sendMsg.size(), 0);
-    return sendLen >= 0;
-}
-
-bool WifiServer::recvMsg(DeviceContext& ctx) {
-    char tempBuf[4096];
-    int recvLen = recv(ctx.socket, tempBuf, sizeof(tempBuf), 0);
-    if (recvLen <= 0) {
-        qDebug()<<"接收出错";
-        return false;
-    }
-
-    // 粘包缓冲
-    recvBuffer.insert(recvBuffer.end(), tempBuf, tempBuf + recvLen);
-
-    while (true) {
-        size_t msgLen = 0;
-        auto result = AdbProtocol::parseAdbMessage(recvBuffer, msgLen);
-        if (!result.has_value()) {
-            qDebug()<<"数据不够，继续接收";
-            break;
-        }
-
-        msg = result.value();  // 取出已完成包
-        recvBuffer.erase(recvBuffer.begin(),recvBuffer.begin() + msgLen);  // 移除已消费
-        return true;
-    }
-
-    return false;  // 当前数据不足，等待更多数据
-}
-
-
-WifiServer::WifiServer():networkInitialized(false),recvData(4096),local_id(0){
+WifiServer::WifiServer():networkInitialized(false){
     networkInitialized=initNetwork();
 }
 
@@ -168,7 +73,7 @@ bool WifiServer::connect(DeviceContext &ctx)
 
 
 
-
+//提取auth后的字符
 std::map<std::string, std::string> parseDeviceInfo(const std::vector<uint8_t>& payload) {
     std::map<std::string, std::string> infoMap;
 
@@ -191,87 +96,48 @@ std::map<std::string, std::string> parseDeviceInfo(const std::vector<uint8_t>& p
 }
 
 
-// bool WifiServer::auth(DeviceContext &ctx)
-// {
-//     //连接请求cnxm
-//     std::vector<uint8_t> connectMessage = AdbProtocol::generateConnect();
-//     sendMsg(connectMessage,ctx);   //发送连接请求
-//     while(!recvMsg(ctx)){
-//         break;
-//     }
-
-//     if(msg.command!=AdbProtocol::CMD_WRTE){
-//         return false;
-//     }
-
-//     //签名数据
-//     std::vector<uint8_t> sigload=AdbCryptoUtils::getInstance().signAdbTokenPayload(msg.payload);
-//     std::vector<uint8_t> sigMsg= AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_SIGNATURE, sigload);
-//     sendMsg(sigMsg,ctx);   //发送连接请求
-//     while(!recvMsg(ctx)){
-//         break;
-//     }
-//     qDebug()<<"发送签名数据";
-
-
-//     //首次连接传输公钥
-//     std::vector<uint8_t> pubKey =AdbCryptoUtils::getInstance().getPublicKeyBytes();
-//     // pubKey.push_back('\0');
-//     std::vector<uint8_t> authPubKey = AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_RSA_PUBLIC,pubKey);
-//     sendMsg(authPubKey,ctx);   //发送连接请求
-//     while(!recvMsg(ctx)){
-//         break;
-//     }
-//     ctx.deviceInfos=parseDeviceInfo(msg.payload);  //解析信息放到上下文中
-//     qDebug()<<"公钥签名完成";
-//     for(auto i:ctx.deviceInfos){
-//         qDebug()<<i.first<<" "<<i.second;
-//     }
-
-//     return true;
-// }
-
-
 bool WifiServer::auth(DeviceContext& ctx) {
-    //发送 CONNECT 请求
+    SOCKET s=ctx.socket;
+    AdbMessage &Msg=ctx.msg;
+
     std::vector<uint8_t> connectMessage = AdbProtocol::generateConnect();
-    sendMsg(connectMessage, ctx);
+    sendMsg(s,connectMessage);
 
     // 等待 AUTH 请求（type = TOKEN）
-    if (!waitForCommand(ctx, AdbProtocol::CMD_AUTH)) {
+    if (!waitForCommand(s,AdbProtocol::CMD_AUTH,Msg)) {
         qDebug() << "未收到 AUTH TOKEN";
         return false;
     }
 
     //  签名 TOKEN 并发送 AUTH(type=signature)
-    std::vector<uint8_t> sigload = AdbCryptoUtils::getInstance().signAdbTokenPayload(msg.payload);
+    std::vector<uint8_t> sigload = AdbCryptoUtils::getInstance().signAdbTokenPayload(Msg.payload);
     std::vector<uint8_t> sigMsg = AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_SIGNATURE, sigload);
-    sendMsg(sigMsg, ctx);
+    sendMsg(s, sigMsg);
 
     //  再等待回应，可能是 CNXN 或再次 AUTH（type=public key）
-    if (!waitForRecv(ctx)) {
+    if (!waitForRecv(s,Msg)) {
         qDebug() << "签名后无回应";
         return false;
     }
 
-    if (msg.command == AdbProtocol::CMD_AUTH) {
+    if (Msg.command == AdbProtocol::CMD_AUTH) {
         // 签名不被信任，发送 PUBLIC KEY
         std::vector<uint8_t> pubKey = AdbCryptoUtils::getInstance().getPublicKeyBytes();
         std::vector<uint8_t> authPubKey = AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_RSA_PUBLIC, pubKey);
-        sendMsg(authPubKey, ctx);
+        sendMsg(s, authPubKey);
 
         // 最后等 CNXN
-        if (!waitForCommand(ctx, AdbProtocol::CMD_CNXN)) {
+        if (!waitForCommand(s, AdbProtocol::CMD_CNXN)) {
             qDebug() << "发送公钥后未连接成功";
             return false;
         }
-    } else if (msg.command != AdbProtocol::CMD_CNXN) {
+    } else if (Msg.command != AdbProtocol::CMD_CNXN) {
         qDebug() << "签名后收到意外命令";
         return false;
     }
 
     //  解析设备信息
-    ctx.deviceInfos = parseDeviceInfo(msg.payload);
+    ctx.deviceInfos = parseDeviceInfo(Msg.payload);
     qDebug() << "设备信息:";
     for (const auto& i : ctx.deviceInfos) {
         qDebug() << i.first << " = " << i.second;
@@ -280,156 +146,139 @@ bool WifiServer::auth(DeviceContext& ctx) {
     return true;
 }
 
-bool WifiServer::waitForRecv(DeviceContext& ctx, int maxAttempts, int intervalMs) {
-    for (int i = 0; i < maxAttempts; ++i) {
-        if (recvMsg(ctx)) {
-            return true;
-        }
-        QThread::msleep(intervalMs);  // 可用 std::this_thread::sleep_for
-    }
-    return false;
-}
 
-bool WifiServer::waitForCommand(DeviceContext& ctx, uint32_t expectCmd) {
-    if (!waitForRecv(ctx)) {
-        return false;
-    }
-    return msg.command == expectCmd;
-}
+// bool WifiServer::openShellChannel(DeviceContext& ctx) {
 
+//     SOCKET s=ctx.socket;
+//     auto openShell = AdbProtocol::generateOpen(++local_id, "shell:");
+//     ctx.local_id = local_id;
+//     sendMsg(s,openShell);   //发送连接请求
+
+//     if (!waitForCommand(s, AdbProtocol::CMD_OKAY)) {
+//         qDebug() << "未收到 ok回复";
+//         return false;
+//     }
+
+//     ctx.remote_id = msg.arg0;
+//     qDebug()<< "提取remote-id"<<ctx.remote_id;
 
 
-bool WifiServer::openShellChannel(DeviceContext& ctx) {
+//     if (!waitForCommand(s, AdbProtocol::CMD_WRTE)) {    //等待写
+//         qDebug() << "未收到回写";
+//         return false;
+//     }
 
-    auto openShell = AdbProtocol::generateOpen(++local_id, "shell:");
-    ctx.local_id = local_id;
-    sendMsg(openShell,ctx);   //发送连接请求
+//     auto okay = AdbProtocol::generateReady(ctx.local_id, ctx.remote_id);
+//     sendMsg(s,okay);
+//     std::string resultStr(msg.payload.begin(), msg.payload.end());
+//     if(resultStr.find("/ $")!=std::string::npos){
+//         qDebug()<<"找到了PD2338"<<resultStr;
+//         return true;
+//     }
 
-    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {
-        qDebug() << "未收到 ok回复";
-        return false;
-    }
+//     return false;
+// }
 
-    ctx.remote_id = msg.arg0;
-    qDebug()<< "提取remote-id"<<ctx.remote_id;
+// bool WifiServer::openSyncChannel(DeviceContext &ctx)   //打开流服务，将文件推送到客户端
+// {
+// auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
+// ctx.local_id = local_id;
+// sendMsg(openSync, ctx);
 
+// // 等待设备返回 OKAY，表示 sync 服务已打开
+// while (true) {
+//     recvMsg(recvData, ctx, msg);
+//     if (msg.command == AdbProtocol::CMD_OKAY) {
+//         qDebug()<<"打开流";
+//         ctx.remote_id = msg.arg0;  // 必须用设备返回的 remote_id
+//         break;
+//     }
+// }
 
-    if (!waitForCommand(ctx, AdbProtocol::CMD_WRTE)) {    //等待写
-        qDebug() << "未收到回写";
-        return false;
-    }
+// Sleep(1000);
 
-    auto okay = AdbProtocol::generateReady(ctx.local_id, ctx.remote_id);
-    sendMsg(okay, ctx);
-    std::string resultStr(msg.payload.begin(), msg.payload.end());
-    if(resultStr.find("/ $")!=std::string::npos){
-        qDebug()<<"找到了PD2338"<<resultStr;
-        return true;
-    }
+// std::string remotePath = "/sdcard/test.txt";
+// std::string sendCmd = "SEND" + remotePath + "," + std::to_string(33206);
 
-    return false;
-}
+// // 构建 payload
+// std::vector<uint8_t> sendPayload(sendCmd.begin(), sendCmd.end());
+// auto wrteSend = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, sendPayload);
+// sendMsg(wrteSend, ctx);
+// while (true) {
+//     recvMsg(recvData, ctx, msg);
+//     if (msg.command == AdbProtocol::CMD_OKAY) {
+//         break;
+//     }
+// }
 
-bool WifiServer::openSyncChannel(DeviceContext &ctx)   //打开流服务，将文件推送到客户端
-{
-    // auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
-    // ctx.local_id = local_id;
-    // sendMsg(openSync, ctx);
+// const size_t CHUNK_SIZE = 4096;
+// std::ifstream file("test.txt", std::ios::binary);
 
-    // // 等待设备返回 OKAY，表示 sync 服务已打开
-    // while (true) {
-    //     recvMsg(recvData, ctx, msg);
-    //     if (msg.command == AdbProtocol::CMD_OKAY) {
-    //         qDebug()<<"打开流";
-    //         ctx.remote_id = msg.arg0;  // 必须用设备返回的 remote_id
-    //         break;
-    //     }
-    // }
+// while (file) {
+//     std::vector<uint8_t> chunk(CHUNK_SIZE);
+//     file.read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
+//     size_t bytesRead = file.gcount();
 
-    // Sleep(1000);
+//     if (bytesRead == 0) break;
 
-    // std::string remotePath = "/sdcard/test.txt";
-    // std::string sendCmd = "SEND" + remotePath + "," + std::to_string(33206);
+//     // 构造 "DATA" + len + payload
+//     std::vector<uint8_t> dataPayload;
+//     dataPayload.insert(dataPayload.end(), {'D','A','T','A'});
 
-    // // 构建 payload
-    // std::vector<uint8_t> sendPayload(sendCmd.begin(), sendCmd.end());
-    // auto wrteSend = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, sendPayload);
-    // sendMsg(wrteSend, ctx);
-    // while (true) {
-    //     recvMsg(recvData, ctx, msg);
-    //     if (msg.command == AdbProtocol::CMD_OKAY) {
-    //         break;
-    //     }
-    // }
+//     uint32_t len = static_cast<uint32_t>(bytesRead);
+//     dataPayload.push_back(len & 0xff);
+//     dataPayload.push_back((len >> 8) & 0xff);
+//     dataPayload.push_back((len >> 16) & 0xff);
+//     dataPayload.push_back((len >> 24) & 0xff);
 
-    // const size_t CHUNK_SIZE = 4096;
-    // std::ifstream file("test.txt", std::ios::binary);
+//     dataPayload.insert(dataPayload.end(), chunk.begin(), chunk.begin() + bytesRead);
 
-    // while (file) {
-    //     std::vector<uint8_t> chunk(CHUNK_SIZE);
-    //     file.read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
-    //     size_t bytesRead = file.gcount();
+//     auto wrteData = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
+//     sendMsg(wrteData, ctx);
+//     while (true) {
+//         recvMsg(recvData, ctx, msg);
+//         if (msg.command == AdbProtocol::CMD_OKAY) {
+//             break;
+//         }
+//     }
+// }
 
-    //     if (bytesRead == 0) break;
+// uint32_t timestamp = static_cast<uint32_t>(std::time(nullptr)); // 当前时间
 
-    //     // 构造 "DATA" + len + payload
-    //     std::vector<uint8_t> dataPayload;
-    //     dataPayload.insert(dataPayload.end(), {'D','A','T','A'});
+// std::vector<uint8_t> donePayload = {'D','O','N','E'};
+// donePayload.push_back(timestamp & 0xff);
+// donePayload.push_back((timestamp >> 8) & 0xff);
+// donePayload.push_back((timestamp >> 16) & 0xff);
+// donePayload.push_back((timestamp >> 24) & 0xff);
 
-    //     uint32_t len = static_cast<uint32_t>(bytesRead);
-    //     dataPayload.push_back(len & 0xff);
-    //     dataPayload.push_back((len >> 8) & 0xff);
-    //     dataPayload.push_back((len >> 16) & 0xff);
-    //     dataPayload.push_back((len >> 24) & 0xff);
-
-    //     dataPayload.insert(dataPayload.end(), chunk.begin(), chunk.begin() + bytesRead);
-
-    //     auto wrteData = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
-    //     sendMsg(wrteData, ctx);
-    //     while (true) {
-    //         recvMsg(recvData, ctx, msg);
-    //         if (msg.command == AdbProtocol::CMD_OKAY) {
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // uint32_t timestamp = static_cast<uint32_t>(std::time(nullptr)); // 当前时间
-
-    // std::vector<uint8_t> donePayload = {'D','O','N','E'};
-    // donePayload.push_back(timestamp & 0xff);
-    // donePayload.push_back((timestamp >> 8) & 0xff);
-    // donePayload.push_back((timestamp >> 16) & 0xff);
-    // donePayload.push_back((timestamp >> 24) & 0xff);
-
-    // auto wrteDone = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, donePayload);
-    // sendMsg(wrteDone, ctx);
-    // while (true) {
-    //     recvMsg(recvData, ctx, msg);
-    //     if (msg.command == AdbProtocol::CMD_OKAY) {
-    //         break;
-    //     }
-    // }
+// auto wrteDone = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, donePayload);
+// sendMsg(wrteDone, ctx);
+// while (true) {
+//     recvMsg(recvData, ctx, msg);
+//     if (msg.command == AdbProtocol::CMD_OKAY) {
+//         break;
+//     }
+// }
 
 
-    // std::vector<uint8_t> quitPayload = {'Q','U','I','T'};
-    // auto wrteQuit = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, quitPayload);
-    // sendMsg(wrteQuit, ctx);
-    // while (true) {
-    //     recvMsg(recvData, ctx, msg);
-    //     if (msg.command == AdbProtocol::CMD_OKAY) {
-    //         break;
-    //     }
-    // }
+// std::vector<uint8_t> quitPayload = {'Q','U','I','T'};
+// auto wrteQuit = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, quitPayload);
+// sendMsg(wrteQuit, ctx);
+// while (true) {
+//     recvMsg(recvData, ctx, msg);
+//     if (msg.command == AdbProtocol::CMD_OKAY) {
+//         break;
+//     }
+// }
 
-    // // 发送 CLSE 关闭
-    // auto close = AdbProtocol::generateClose(ctx.local_id, ctx.remote_id);
-    // sendMsg(close, ctx);
+// // 发送 CLSE 关闭
+// auto close = AdbProtocol::generateClose(ctx.local_id, ctx.remote_id);
+// sendMsg(close, ctx);
 
 
 
-    return true;
-}
+//     return true;
+// }
 
 
 // void startScrcpy(const QString &serial)
@@ -456,122 +305,186 @@ bool WifiServer::openSyncChannel(DeviceContext &ctx)   //打开流服务，将�
 //     });
 // }
 
-bool WifiServer::executeShell(std::string &cmd,DeviceContext &ctx){
+// bool WifiServer::executeShell(std::string &cmd,DeviceContext &ctx){
 
-    if(!openShellChannel(ctx)){
-        qDebug()<<"打开流失败";
-        return false;
-    }
+//     if(!openShellChannel(ctx)){
+//         qDebug()<<"打开流失败";
+//         return false;
+//     }
 
-    std::vector<std::string> wrtePayloads;
-    std::string shellPromptSuffix = "/ $ ";  // 更通用的 shell 提示符
+//     std::vector<std::string> wrtePayloads;
+//     std::string shellPromptSuffix = "/ $ ";  // 更通用的 shell 提示符
 
-    // std::string cmd = "getprop ro.serialno\n";  // 必须带换行符
-    std::vector<uint8_t> dataPayload(cmd.begin(), cmd.end());  // 转换为字节数组
-    auto wrteData = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
-    sendMsg(wrteData, ctx); // 发送 WRTE（命令）
+//     // std::string cmd = "getprop ro.serialno\n";  // 必须带换行符
+//     std::vector<uint8_t> dataPayload(cmd.begin(), cmd.end());  // 转换为字节数组
+//     auto wrteData = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
+//     sendMsg(ctx.socket,wrteData); // 发送 WRTE（命令）
 
-    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
-        qDebug() << "未收到ok";
-        return false;
-    }
+//     if (!waitForCommand(ctx.socket, AdbProtocol::CMD_OKAY)) {    //接收ok
+//         qDebug() << "未收到ok";
+//         return false;
+//     }
 
-    while (true) {     //循环接收写
+//     while (true) {     //循环接收写
 
-        if (!waitForCommand(ctx, AdbProtocol::CMD_WRTE)) {    //等待写
-            qDebug() << "未收到回写";
-            return false;
-        }
+//         if (!waitForCommand(ctx.socket, AdbProtocol::CMD_WRTE)) {    //等待写
+//             qDebug() << "未收到回写";
+//             return false;
+//         }
 
-        auto readyMsg = AdbProtocol::generateReady(ctx.local_id, ctx.remote_id);
-        sendMsg(readyMsg, ctx);
-        qDebug() << "收到回写 发送 OKAY";
-        if(msg.payload.empty()){
-            qDebug()<<"payload为空,跳过后续处理";
-            continue;
-        }
-        // 提取数据
-        std::string result(msg.payload.begin(), msg.payload.end());
-        wrtePayloads.push_back(result);
-        qDebug() << "payload接收: " << QString::fromStdString(result);
+//         auto readyMsg = AdbProtocol::generateReady(ctx.local_id, ctx.remote_id);
+//         sendMsg(ctx.socket,readyMsg);
+//         qDebug() << "收到回写 发送 OKAY";
+//         if(msg.payload.empty()){
+//             qDebug()<<"payload为空,跳过后续处理";
+//             continue;
+//         }
+//         // 提取数据
+//         std::string result(msg.payload.begin(), msg.payload.end());
+//         wrtePayloads.push_back(result);
+//         qDebug() << "payload接收: " << QString::fromStdString(result);
 
-        // 判断接收是否结束
-        if (result.find(shellPromptSuffix) != std::string::npos) {
-            qDebug() << "检测到提示符，命令执行结束";
-            break;
-        }
-    }
+//         // 判断接收是否结束
+//         if (result.find(shellPromptSuffix) != std::string::npos) {
+//             qDebug() << "检测到提示符，命令执行结束";
+//             break;
+//         }
+//     }
 
 
-    std::string serialno = extractShellResult(wrtePayloads,cmd);
-    if (!serialno.empty()) {
-        qDebug() << "提取执行结果: " << QString::fromStdString(serialno);
-    } else {
-        qDebug() << "未能提取到执行结果";
-    }
+//     std::string serialno = extractShellResult(wrtePayloads,cmd);
+//     if (!serialno.empty()) {
+//         qDebug() << "提取执行结果: " << QString::fromStdString(serialno);
+//     } else {
+//         qDebug() << "未能提取到执行结果";
+//     }
 
-    QString str=QString::fromStdString(serialno);
-}
+//     QString str=QString::fromStdString(serialno);
+// }
+
+
+// auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
+// ctx.local_id = local_id;
+// sendMsg(openSync, ctx);
+// if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
+//     qDebug() << "未收到ok";
+//     return false;
+// }
+// ctx.remote_id = msg.arg0;
+
+
+
+
+
+// bool WifiServer::pushFile(SOCKET sock,int local_id,int remote_id,std::string& localFilePath,std::string remoteFilePath){
+//     //SEND命令
+//     std::string remotePath = remoteFilePath+",33206"; // 第二个参数是权限
+//     std::vector<uint8_t> sendPayload =AdbSyncProtocol::generateSEND(remotePath);
+//     auto sMsg = AdbProtocol::generateWrite(local_id,remote_id,sendPayload);
+//     sendMsg(sock,sMsg);
+//     if (!waitForCommand(sock, AdbProtocol::CMD_OKAY)) {    //接收ok
+//         qDebug() << "未收到ok";
+//         return false;
+//     }
+
+//     //打开文件，读取发送
+//     std::ifstream file(localFilePath,std::ios::binary);
+//     const size_t blockSize = 64 * 1024;
+//     std::vector<uint8_t> buffer(blockSize);  // 这一行是定义 buffer 的地方
+//     while (file.read((char*)buffer.data(), blockSize) || file.gcount() > 0) {
+//         auto dataPayload = AdbSyncProtocol::generateDATA(buffer, file.gcount());
+//         auto writeMsg = AdbProtocol::generateWrite(local_id,remote_id, dataPayload);
+//         sendMsg(sock,writeMsg);
+//         waitForCommand(sock, AdbProtocol::CMD_OKAY);
+//     }
+
+//     uint32_t mtime = static_cast<uint32_t>(std::time(nullptr));
+//     auto donePayload = AdbSyncProtocol::generateDONE(mtime);
+//     auto doneMsg = AdbProtocol::generateWrite(local_id, remote_id, donePayload);
+//     sendMsg(sock,doneMsg);
+//     waitForCommand(sock, AdbProtocol::CMD_OKAY);
+//     auto closeMsg = AdbProtocol::generateClose(local_id,remote_id);
+//     sendMsg(sock,closeMsg);
+// }
+
+
+
 
 
 bool WifiServer::execute(DeviceContext &ctx)    //后续解耦
 {
+    //解析命令
+
+    //执行
+
+    const auto& cmd = ctx.cmd;
+    switch (cmd.type) {
+    case CmdType::Push:
+        return pushHandler(socket);   //需要命令的参数 socket发送，缓冲区数据，以及结果，
+    // case CmdType::Shell:
+    //     return handleShell(ctx, cmd.params);
+    default:
+        return false;
+    }
+
+
+
     // if(!openShellChannel(ctx)){
     //     qDebug()<<"打开流失败";
     //     return false;
     // }
 
-    std::string cmd = "getprop ro.serialno\n";
+    // std::string cmd = "getprop ro.serialno\n";
+    // // executeShell(cmd,ctx);
+
+    // cmd = "ls /data/local/tmp\n";
     // executeShell(cmd,ctx);
 
-    cmd = "ls /data/local/tmp\n";
-    executeShell(cmd,ctx);
+    // // cmd = "ls\n";
+    // // executeShell(cmd,ctx);
 
-    // cmd = "ls\n";
-    // executeShell(cmd,ctx);
-
-    // cmd = "date\n";
-    // executeShell(cmd,ctx);
+    // // cmd = "date\n";
+    // // executeShell(cmd,ctx);
 
 
-    // cmd = "whoami\n";
-    // executeShell(cmd,ctx);
+    // // cmd = "whoami\n";
+    // // executeShell(cmd,ctx);
 
-    auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
-    ctx.local_id = local_id;
-    sendMsg(openSync, ctx);
-    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
-        qDebug() << "未收到ok";
-        return false;
-    }
-    ctx.remote_id = msg.arg0;
+    // auto openSync = AdbProtocol::generateOpen(++local_id, "sync:");
+    // ctx.local_id = local_id;
+    // sendMsg(openSync, ctx);
+    // if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
+    //     qDebug() << "未收到ok";
+    //     return false;
+    // }
+    // ctx.remote_id = msg.arg0;
 
-    //SEND
+    // //SEND
 
-    std::string remotePath = "/data/local/tmp/CMakeLists.txt,33206"; // 第二个参数是权限
-    std::vector<uint8_t> sendPayload =AdbSyncProtocol::generateSEND(remotePath);
-    auto sMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id,sendPayload);
-    sendMsg(sMsg,ctx);
-    if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
-        qDebug() << "未收到ok";
-        return false;
-    }
+    // std::string remotePath = "/data/local/tmp/CMakeLists.txt,33206"; // 第二个参数是权限
+    // std::vector<uint8_t> sendPayload =AdbSyncProtocol::generateSEND(remotePath);
+    // auto sMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id,sendPayload);
+    // sendMsg(sMsg,ctx);
+    // if (!waitForCommand(ctx, AdbProtocol::CMD_OKAY)) {    //接收ok
+    //     qDebug() << "未收到ok";
+    //     return false;
+    // }
 
-    std::ifstream file("D:/Documents/mineQtScrcpy/CMakeLists.txt", std::ios::binary);
-    const size_t blockSize = 64 * 1024;
-    std::vector<uint8_t> buffer(blockSize);  // 这一行是定义 buffer 的地方
-    while (file.read((char*)buffer.data(), blockSize) || file.gcount() > 0) {
-        auto dataPayload = AdbSyncProtocol::generateDATA(buffer, file.gcount());
-        auto writeMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
-        sendMsg(writeMsg, ctx);
-        waitForCommand(ctx, AdbProtocol::CMD_OKAY);
-    }
+    // std::ifstream file("D:/Documents/mineQtScrcpy/CMakeLists.txt", std::ios::binary);
+    // const size_t blockSize = 64 * 1024;
+    // std::vector<uint8_t> buffer(blockSize);  // 这一行是定义 buffer 的地方
+    // while (file.read((char*)buffer.data(), blockSize) || file.gcount() > 0) {
+    //     auto dataPayload = AdbSyncProtocol::generateDATA(buffer, file.gcount());
+    //     auto writeMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, dataPayload);
+    //     sendMsg(writeMsg, ctx);
+    //     waitForCommand(ctx, AdbProtocol::CMD_OKAY);
+    // }
 
-    uint32_t mtime = static_cast<uint32_t>(std::time(nullptr));
-    auto donePayload = AdbSyncProtocol::generateDONE(mtime);
-    auto doneMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, donePayload);
-    sendMsg(doneMsg, ctx);
-    waitForCommand(ctx, AdbProtocol::CMD_OKAY);
+    // uint32_t mtime = static_cast<uint32_t>(std::time(nullptr));
+    // auto donePayload = AdbSyncProtocol::generateDONE(mtime);
+    // auto doneMsg = AdbProtocol::generateWrite(ctx.local_id, ctx.remote_id, donePayload);
+    // sendMsg(doneMsg, ctx);
+    // waitForCommand(ctx, AdbProtocol::CMD_OKAY);
 
 
 
@@ -809,3 +722,194 @@ bool WifiServer::close(DeviceContext &ctx)
 
 //     return false;
 // }
+
+
+
+std::vector<uint8_t> WifiServer::create_adb_packet(const std::string& payload) {
+    std::vector<uint8_t> packet;
+    uint32_t length = static_cast<uint32_t>(payload.length());
+
+    // 添加长度字段（网络字节序）
+    packet.push_back((length >> 24) & 0xFF);
+    packet.push_back((length >> 16) & 0xFF);
+    packet.push_back((length >> 8) & 0xFF);
+    packet.push_back(length & 0xFF);
+
+    // 添加payload
+    for (char c : payload) {
+        packet.push_back(static_cast<uint8_t>(c));
+    }
+
+    return packet;
+}
+
+// std::string WifiServer::adb_version_response(int version = 31) {
+//     if (version < 0 || version >= 0x10000) {
+//         throw std::invalid_argument("Version number must be in the range 0 to 65535.");
+//     }
+//     char buffer[8];
+//     snprintf(buffer, sizeof(buffer), "OKAY%04x", version);
+//     return std::string(buffer);
+// }
+
+// 处理 scrcpy 发来的 host: 系列命令
+
+std::string WifiServer::buildAdbStringResponse(const std::string& payloadStr) {
+    std::string response = "OKAY";
+
+    uint32_t len = static_cast<uint32_t>(payloadStr.size());
+    char lenBytes[4] = {
+        static_cast<char>((len >> 24) & 0xFF),
+        static_cast<char>((len >> 16) & 0xFF),
+        static_cast<char>((len >> 8) & 0xFF),
+        static_cast<char>((len) & 0xFF),
+    };
+    response.append(lenBytes, 4);
+    response.append(payloadStr);
+    return response;
+}
+
+
+
+
+void WifiServer::handleHostCommand(std::string& cmdStr, int clientSocket) {
+    // if (rawData.size() < 4) {
+    //     qDebug() << "数据不足，无法解析";
+    //     return;
+    // }
+
+    // // 第一步：解析命令长度
+    // std::string lenStr(rawData.begin(), rawData.begin() + 4);  // 比如 "000c"
+    // int payloadLen = std::stoi(lenStr, nullptr, 16);
+
+    // if (rawData.size() < 4 + payloadLen) {
+    //     qDebug() << "数据未接收完整";
+    //     return;
+    // }
+
+    // 第二步：提取命令字符串
+    // std::string cmdStr(rawData.begin() + 4, rawData.begin() + 4 + payloadLen);
+    qDebug() << "收到 host 命令:" << QString::fromStdString(cmdStr);
+
+    // 构造响应内容
+    std::string response;
+
+    if (cmdStr == "host:version") {
+        std::string payload = "0029";  // adb版本31 = 0x001f
+        response = "OKAY0004" + payload;
+        //response=buildAdbBinaryResponse("0029");
+        response=buildAdbStringResponse("0029");
+    } else if (cmdStr.find("host:devices")!=std::string::npos) {
+        std::string deviceList = "192.168.1.2:5555\tdevice\n";
+        response=buildAdbStringResponse(deviceList);
+    } /*else if (cmdStr.find("host:transport") != std::string::npos) {
+        // host:transport:序列号/设备ip
+        response = "OKAY";  // 表示切换 transport 成功
+        // 后续数据将以 wire protocol 处理（比如 OPEN/WRTE 等）
+        //isTransported = true;
+
+    } else {
+        std::string unknown = "unknown command\n";
+        std::ostringstream oss;
+        oss << "FAIL" << std::setw(4) << std::setfill('0') << std::hex << unknown.size();
+        oss << unknown;
+        response = oss.str();
+    }*/
+
+    // 第三步：发送回应
+    //send(clientSocket, response.data(), response.size(), 0);
+    qDebug()<<"response"<<response.data()<<"长度"<<response.size();
+    send(clientSocket, response.data(), response.size(), 0);
+    qDebug() << "已回复 host 指令:" << QString::fromStdString(cmdStr);
+}
+
+
+// 发送 OKAY 包的辅助函数
+// void WifiServer::sendOkay(uint32_t local, uint32_t remote, DeviceContext& ctx) {
+//     auto msg = AdbProtocol::generateOkay(local, remote);
+//     sendMsg(msg, ctx);
+// }
+
+// // 发送 WRTE + READY 包的辅助函数（用于回复数据）
+// void WifiServer::sendWrite(uint32_t local, uint32_t remote, const std::string& data, DeviceContext& ctx) {
+//     auto payload = std::vector<uint8_t>(data.begin(), data.end());
+//     sendMsg(AdbProtocol::generateWrite(local, remote, payload), ctx);
+//     sendMsg(AdbProtocol::generateReady(local, remote), ctx);
+// }
+
+// // 你主循环处理接收包时的简要示范（伪代码）
+// void WifiServer::onReceiveAdbMessage(DeviceContext& ctx) {
+//     if (msg.command == AdbProtocol::CMD_WRTE) {
+//         std::string content(msg.payload.begin(), msg.payload.end());
+//         if (content.rfind("host:", 0) == 0) {
+//             // 处理 host: 系列命令
+//             handleScrcpyHostCommand(content, ctx);
+//         }
+//         else if (content.rfind("shell:", 0) == 0) {
+//             // 处理 shell 命令，如启动 scrcpy-server.jar
+//             // 你已有 shell channel 代码，可在这里调度
+//             openShellChannel(ctx);
+//         }
+//         else {
+//             // 其他命令或数据，按你的设计处理
+//         }
+//     }
+//     else if (msg.command == AdbProtocol::CMD_CLSE) {
+//         // 连接关闭，清理资源
+//     }
+// }
+
+// void WifiServer::handleClient(){
+
+// }
+
+bool WifiServer::sendMsg(SOCKET socket_,std::vector<uint8_t>& sendMsg) {   //根据套接字来发送
+    int sendLen = send(socket_, reinterpret_cast<const char*>(sendMsg.data()), sendMsg.size(), 0);
+    return sendLen >0;
+}
+
+bool WifiServer::recvMsg(SOCKET sock,AdbMessage& outMsg) {
+    char tempBuf[512];
+    std::vector<uint8_t>recvBuffer(512);
+    int recvLen = recv(sock, tempBuf, sizeof(tempBuf), 0);
+    if (recvLen <= 0) {
+        qDebug()<<"接收出错";
+        return false;
+    }
+
+    // 粘包缓冲
+    recvBuffer.insert(recvBuffer.end(), tempBuf, tempBuf + recvLen);
+
+    while (true) {
+        size_t msgLen = 0;
+        auto result = AdbProtocol::parseAdbMessage(recvBuffer, msgLen);
+        if (!result.has_value()) {
+            qDebug()<<"数据不够，继续接收";
+            break;
+        }
+
+        outMsg = result.value();  // 取出已完成包
+        recvBuffer.erase(recvBuffer.begin(),recvBuffer.begin() + msgLen);  // 移除已消费
+        return true;
+    }
+
+    return false;  // 当前数据不足，等待更多数据
+}
+
+
+bool WifiServer::waitForRecv(SOCKET socket_,AdbMessage& outMsg,int maxAttempts, int intervalMs) {
+    for (int i = 0; i < maxAttempts; ++i) {
+        if (recvMsg(socket_,outMsg)) {
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    return false;
+}
+
+bool WifiServer::waitForCommand(SOCKET socket_, uint32_t expectCmd,AdbMessage& inputMsg) {
+    if (!waitForRecv(socket_,inputMsg)) {
+        return false;
+    }
+    return inputMsg.command == expectCmd;
+}
