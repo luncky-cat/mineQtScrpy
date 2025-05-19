@@ -1,11 +1,6 @@
 #ifndef ADBCRYPTOUTILS_H
 #define ADBCRYPTOUTILS_H
 
-
-
-// #include "include/openssl/evp.h"
-//#include <openssl/evp.h>
-
 #include<openssl/evp.h>
 #include <vector>
 
@@ -26,7 +21,6 @@ private:
     EVP_PKEY* private_key_;  // 存储私钥
     EVP_PKEY* public_key_;   // 存储公钥
     static constexpr size_t MY_SHA_DIGEST_LENGTH = 32;
-
     AdbCryptoUtils();
     AdbCryptoUtils(const AdbCryptoUtils&) = delete;
     AdbCryptoUtils& operator=(const AdbCryptoUtils&) = delete;
