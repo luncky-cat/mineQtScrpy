@@ -8,10 +8,10 @@
 class ITransPortFactory
 {
 public:
-    static std::unique_ptr<ITransPort> create(ConnectType type){
+    static ITransPort* create(ConnectType type){
         switch (type) {
         case ConnectType::WiFi:
-            return std::make_unique<SocketTransPort>();
+            return new SocketTransPort;
         default:
             return nullptr;
         }
