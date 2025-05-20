@@ -12,6 +12,7 @@
 #include "protocol/AdbProtocol.h"
 #include "utils/CryptoUtils.h"
 #include "context/DeviceContext.h"
+#include "interfaces/ICommandHandler.h"
 
 
 WifiServer::WifiServer():networkInitialized(false){
@@ -63,6 +64,7 @@ bool WifiServer::connect(DeviceContext &ctx)
     }
 
     ctx.transPort->setSocket(sock);
+    qDebug()<<sock<<"套接字存在";
 
     return true;
 }
@@ -108,7 +110,7 @@ bool WifiServer::auth(DeviceContext& ctx) {
     transPort->sendMsg(sigMsg);
 
     //  再等待回应，可能是 CNXN 或再次 AUTH（type=public key）
-    if (!transPort->waitForRecv(Msg)) {
+    if (!transPort->waitForRecv(Msg,50,100)) {
         qDebug() << "签名后无回应";
         return false;
     }
@@ -407,15 +409,30 @@ bool WifiServer::auth(DeviceContext& ctx) {
 bool WifiServer::execute(DeviceContext &ctx)    //后续解耦
 {
     //解析命令
-
+    ctx.cmd.type=CmdType::Push;
+    ctx.cmd.params.push_back("D:\\Documents\\mineQtScrcpy\\scrcpy\\scrcpy-server");
+    ctx.cmd.params.push_back("/data/local/tmp/scrcpy-server.jar");
     //执行
+    if(ctx.cmd.params.empty()){
+        qDebug()<<"无命令操作";
+        return true;
+    }
+    qDebug()<<"执行命令";
+    bool result=false;
+    const auto& cmd = ctx.cmd;
+    auto it=commandHandlers.find(cmd.type);
+    if (it != commandHandlers.end()) {
+        result=it->second->CommandHandler(*ctx.transPort,ctx);
+    }
+    if(result){
+        qDebug()<<"执行成功";
+    }
 
-    // const auto& cmd = ctx.cmd;
-    // auto it=CommandHandlers.find(cmd.type);
-    // if (it != CommandHandlers.end()) {
-    //     return it->second->CommandHandler(TransPort, ctx);
-    // }
-    return false;
+
+
+
+
+    return result;
 
 
 
