@@ -2,6 +2,9 @@
 
 #include "protocol/AdbProtocol.h"
 
+#include<chrono>
+#include <qDebug>
+#include<thread>
 #include<WinSock2.h>
 #include <qDebug>
 
@@ -13,13 +16,14 @@ void SocketTransPort::setSocket(int sock)
 }
 
 bool SocketTransPort::sendMsg(const std::vector<uint8_t>& data) {   //根据套接字来发送
+    qDebug()<<socket_<<"发送数据";
     int sendLen = send(socket_, reinterpret_cast<const char*>(data.data()), data.size(), 0);
     return sendLen >0;
 }
 
 bool SocketTransPort::recvMsg(AdbMessage& outMsg) {
+    qDebug()<<socket_<<"接收数据";
     char tempBuf[512];
-    std::vector<uint8_t>recvBuffer(512);
     int recvLen = recv(socket_, tempBuf, sizeof(tempBuf), 0);
     if (recvLen <= 0) {
         qDebug()<<"接收出错";
@@ -27,20 +31,39 @@ bool SocketTransPort::recvMsg(AdbMessage& outMsg) {
     }
 
     // 粘包缓冲
-    recvBuffer.insert(recvBuffer.end(), tempBuf, tempBuf + recvLen);
+    recvBuffer_.insert(recvBuffer_.end(), tempBuf, tempBuf + recvLen);
 
     while (true) {
         size_t msgLen = 0;
-        auto result = AdbProtocol::parseAdbMessage(recvBuffer, msgLen);
+        auto result = AdbProtocol::parseAdbMessage(recvBuffer_, msgLen);
         if (!result.has_value()) {
             qDebug()<<"数据不够，继续接收";
             break;
         }
 
         outMsg = result.value();  // 取出已完成包
-        recvBuffer.erase(recvBuffer.begin(),recvBuffer.begin() + msgLen);  // 移除已消费
+        qDebug()<<"有数据"<<outMsg.command;
+        recvBuffer_.erase(recvBuffer_.begin(),recvBuffer_.begin() + msgLen);  // 移除已消费
         return true;
     }
 
     return false;  // 当前数据不足，等待更多数据
+}
+
+bool SocketTransPort::waitForRecv(AdbMessage& outMsg,int maxAttempts, int intervalMs) {
+    for (int i = 0; i < maxAttempts; ++i) {
+        if (recvMsg(outMsg)) {
+            return true;
+        }
+        qDebug()<<"等待100ms";
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    return false;
+}
+
+bool SocketTransPort::waitForCommand(uint32_t expectCmd,AdbMessage& inputMsg) {
+    if (!waitForRecv(inputMsg)) {
+        return false;
+    }
+    return inputMsg.command == expectCmd;
 }
