@@ -15,11 +15,11 @@
 
 class DeviceContext {
 public:
-    DeviceContext(IServer* strategyPtr = nullptr)
+    DeviceContext(IServer* strategyPtr = nullptr,ITransPort *transPortPtr=nullptr)
         :local_id(-1),
         remote_id(-1),
         status(DeviceStatus::Disconnected),isOpenShell(false),
-        isOpenSync(false),strategy(strategyPtr){}
+        isOpenSync(false),strategy(strategyPtr),transPort(transPortPtr){}
     void setConnectInfo(ConnectInfo info){
         connectInfo=info;
     }
