@@ -4,6 +4,8 @@
 #include <QListWidget>
 #include <QWidget>
 
+class DeviceListView;
+
 class SidebarWidget : public QWidget
 {
     Q_OBJECT

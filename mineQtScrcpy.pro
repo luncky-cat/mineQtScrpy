@@ -65,6 +65,7 @@ SOURCES += \
     Scanner/networkutils.cpp \
     adbServer/code/AdbServer.cpp \
     adbServer/handlers/pushHandler.cpp \
+    adbServer/handlers/shellHandler.cpp \
     adbServer/protocol/AdbProtocol.cpp \
     adbServer/protocol/AdbSyncProtocol.cpp \
     adbServer/server/WifiServer.cpp \
@@ -73,7 +74,6 @@ SOURCES += \
     adbServer/states/DisconnectedState.cpp \
     adbServer/states/ExecutingState.cpp \
     adbServer/states/IState.cpp \
-    adbServer/transport/ITransPort.cpp \
     adbServer/transport/socketTransPort.cpp \
     adbServer/utils/CryptoUtils.cpp \
     adbServer/utils/ThreadPool.cpp \
@@ -107,6 +107,7 @@ HEADERS += \
     adbServer/context/DeviceContext.h \
     adbServer/context/DeviceStatus.h \
     adbServer/handlers/pushHandler.h \
+    adbServer/handlers/shellHandler.h \
     adbServer/interfaces/ICommandHandler.h \
     adbServer/interfaces/IServer.h \
     adbServer/interfaces/IState.h \

@@ -61,8 +61,11 @@ void androidManager::onDevicesAdded(const QSet<ConnectInfo>& DeviceChangeSet) {
 
     //渲染到ui中，这些可连接设备
 
+
+
+
     for(auto info:DeviceChangeSet){   //调试输出
-        //AdbServer::getInstance().asyncConnectDevice(info.deviceId.toStdString());
+        AdbServer::getInstance().asyncConnectDevice(info.deviceId.toStdString());
     }
 
 

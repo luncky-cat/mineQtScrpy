@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QGroupBox>
 #include <QListWidget>
+#include "DeviceListView.h"
 
 SidebarWidget::SidebarWidget(QWidget *parent)
     : QWidget(parent)

@@ -17,7 +17,7 @@ public:
     explicit DeviceListView(QWidget *parent = nullptr);
     void setDeviceModel(DeviceListModel *model); // 设置自定义模型
 protected:
-   void drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const; //override
+  // void drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const; //override
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
 

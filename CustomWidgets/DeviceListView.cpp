@@ -15,22 +15,22 @@ void DeviceListView::setDeviceModel(DeviceListModel *model)
     setModel(m_deviceModel); // 设置模型
 }
 
-void DeviceListView::drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
-{
-    // if (!index.isValid()) return;
+// void DeviceListView::drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+// {
+//     // if (!index.isValid()) return;
 
-    // // 设置交替行的背景色
-    // if (index.row() % 2 == 0) {
-    //     painter->fillRect(option.rect, QColor(240, 240, 240)); // 背景颜色
-    // } else {
-    //     painter->fillRect(option.rect, QColor(255, 255, 255)); // 背景颜色
-    // }
+//     // // 设置交替行的背景色
+//     // if (index.row() % 2 == 0) {
+//     //     painter->fillRect(option.rect, QColor(240, 240, 240)); // 背景颜色
+//     // } else {
+//     //     painter->fillRect(option.rect, QColor(255, 255, 255)); // 背景颜色
+//     // }
 
-    // // 画文本
-    // QStyleOptionViewItem opt = option;
-    // initStyleOption(&opt, index);
-    // style()->drawControl(QStyle::CE_ItemViewItem, &opt, painter);
-}
+//     // // 画文本
+//     // QStyleOptionViewItem opt = option;
+//     // initStyleOption(&opt, index);
+//     // style()->drawControl(QStyle::CE_ItemViewItem, &opt, painter);
+// }
 
 void DeviceListView::mouseDoubleClickEvent(QMouseEvent *event)
 {
@@ -48,3 +48,12 @@ void DeviceListView::contextMenuEvent(QContextMenuEvent *event)
     // menu.addAction("Option 2");
     // menu.exec(event->globalPos());
 }
+
+
+// class DeviceItemDelegate : public QStyledItemDelegate {
+// public:
+//     void paint(QPainter *painter, const QStyleOptionViewItem &option,
+//                const QModelIndex &index) const override {
+//         // 在这里写你原本想放在 drawRow() 中的绘制逻辑
+//     }
+// };

@@ -14,7 +14,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 创建展示区和侧边栏
     showLayout *show = new showLayout();
-    SidebarWidget *sidebar = new SidebarWidget();
+    sidebar = new SidebarWidget(this);
 
     // 设置主布局为横向布局
     QHBoxLayout *mainLayout = new QHBoxLayout();

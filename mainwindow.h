@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 
-
+class SidebarWidget;
 
 class androidManager;
 
@@ -22,7 +22,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     androidManager* manger;
-   
+    SidebarWidget *sidebar;
 private:
     Ui::MainWindow *ui;
 };
