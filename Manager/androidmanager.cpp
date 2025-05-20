@@ -3,7 +3,7 @@
 /*#include "AddDeviceWorker.h"            // 假设你分到单独头文件
 #include "RemoveDeviceWorker.h"  */       // 同上
 #include "Scanner/listenDevice.h"
-#include "adbServer/AdbServer.h"
+#include "adbServer/code/AdbServer.h"
 
 //#include<qDebug>
 
@@ -62,7 +62,7 @@ void androidManager::onDevicesAdded(const QSet<ConnectInfo>& DeviceChangeSet) {
     //渲染到ui中，这些可连接设备
 
     for(auto info:DeviceChangeSet){   //调试输出
-        bool sull=AdbServer::getInstance().connectDevice(info.deviceId.toStdString());
+        //AdbServer::getInstance().asyncConnectDevice(info.deviceId.toStdString());
     }
 
 

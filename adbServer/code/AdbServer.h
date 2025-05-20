@@ -1,20 +1,14 @@
 #ifndef ADBSERVER_H
 #define ADBSERVER_H
 
-#include "Device/DeviceContext.h"
-#include "DeviceServerFactory.hpp"
-
-#include <winsock2.h>
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <memory>
 
+class DeviceContext;
 
-// threadPool.submit([=]() {
-//     this->handleDeviceConnection(clientSocket);
-// });
-
+#include "server/DeviceServerFactory.hpp"
+#include "interfaces/IState.h"
 
 class AdbServer {
 public:
@@ -33,7 +27,7 @@ public:
     bool disconnectDevice(const std::string& deviceId);  // 断开设备
 
     // 设备状态查询接口
-    DeviceStatus getDeviceStatus(const std::string& deviceId) const;  // 获取设备状态
+   // DeviceStatus getDeviceStatus(const std::string& deviceId) const;  // 获取设备状态
     bool isDeviceConnected(const std::string& deviceId) const;  // 检查设备是否连接
 
 
@@ -54,7 +48,7 @@ private:
     AdbServer& operator=(const AdbServer&) = delete;
 
     // 状态管理
-    bool setState(const std::string& deviceId, std::unique_ptr<IAdbState> newState);
+    bool setState(const std::string& deviceId, std::unique_ptr<IState> newState);
 
     // 设备上下文管理
     DeviceContext* getDeviceContext(const std::string& deviceId);
@@ -62,12 +56,10 @@ private:
 
     int ADB_PORT = 8091;
     int BUFFER_SIZE = 4096;
-
     int serverSocket;
-
 private:
     std::unordered_map<std::string, DeviceContext> deviceContextMap;
-    std::unique_ptr<DeviceServerFactory>fac;  //用于得到需要的服务
+    std::unique_ptr<IServerFactory>fac;  //用于得到需要的服务
 };
 
 #endif // ADBSERVER_H

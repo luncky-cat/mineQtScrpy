@@ -67,7 +67,7 @@ void WifiScanner::handleDeviceFound(const QString& ip, quint16 port) {
 
     qDebug() << "scanner组织结构:" << ip << ", 端口:" << port;
     ConnectInfo info;
-    info.deviceId=ip;
+    info.deviceId=ip+":"+QString::number(port);
     info.ConnectType=ConnectType::WiFi;
     info.port=port;
     info.ipAddress=ip;

@@ -10,18 +10,18 @@ DeviceManager::DeviceManager(QObject* parent)
     : QObject(parent)
     , m_adbServer(AdbServer::getInstance())
 {
-    // 设置 AdbServer 回调
-    m_adbServer.setDeviceStatusChangedCallback([this](const std::string& deviceId, DeviceStatus status) {
-        emit deviceStatusChanged(QString::fromStdString(deviceId), status);
-    });
+    // // 设置 AdbServer 回调
+    // m_adbServer.setDeviceStatusChangedCallback([this](const std::string& deviceId, DeviceStatus status) {
+    //     emit deviceStatusChanged(QString::fromStdString(deviceId), status);
+    // });
 
-    m_adbServer.setDeviceConnectedCallback([this](const std::string& deviceId) {
-        emit deviceConnected(QString::fromStdString(deviceId));
-    });
+    // m_adbServer.setDeviceConnectedCallback([this](const std::string& deviceId) {
+    //     emit deviceConnected(QString::fromStdString(deviceId));
+    // });
 
-    m_adbServer.setDeviceDisconnectedCallback([this](const std::string& deviceId) {
-        emit deviceDisconnected(QString::fromStdString(deviceId));
-    });
+    // m_adbServer.setDeviceDisconnectedCallback([this](const std::string& deviceId) {
+    //     emit deviceDisconnected(QString::fromStdString(deviceId));
+    // });
 }
 
 bool DeviceManager::addDevice(const ConnectInfo& info) {

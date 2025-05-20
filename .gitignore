@@ -22,3 +22,6 @@ build/
 #server 
 scrcpy/
 
+CMakeLists.txt
+test_adbserver.cpp
+third_party/

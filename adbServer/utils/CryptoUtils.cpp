@@ -1,4 +1,4 @@
-#include "AdbCryptoUtils.h"
+#include "CryptoUtils.h"
 
 #include <openssl/rsa.h>
 #include <openssl/bn.h>
@@ -8,7 +8,7 @@
 #include <iostream>
 #include <memory>
 
-AdbCryptoUtils::AdbCryptoUtils() {
+CryptoUtils::CryptoUtils() {
     OpenSSL_add_all_algorithms();  // 只在需要时使用
     private_key_ = EVP_PKEY_new();  // 初始化 EVP_PKEY
     public_key_ = EVP_PKEY_new();   // 初始化 EVP_PKEY
@@ -32,13 +32,13 @@ AdbCryptoUtils::AdbCryptoUtils() {
     }
 }
 
-AdbCryptoUtils &AdbCryptoUtils::getInstance()
+CryptoUtils &CryptoUtils::getInstance()
 {
-    static AdbCryptoUtils instance; // C++11 线程安全懒汉式单例
+    static CryptoUtils instance; // C++11 线程安全懒汉式单例
     return instance;
 }
 
-AdbCryptoUtils::~AdbCryptoUtils() {
+CryptoUtils::~CryptoUtils() {
     // 对私钥进行处理
     if (private_key_) {
         if (!savePrivateKey()) {
@@ -59,7 +59,7 @@ AdbCryptoUtils::~AdbCryptoUtils() {
 }
 
 
-bool AdbCryptoUtils::generateRsaKeys(int keyLengthBits) {
+bool CryptoUtils::generateRsaKeys(int keyLengthBits) {
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr);
     if (!ctx) {
         std::cerr << "EVP_PKEY_CTX_new_id failed!" << std::endl;
@@ -101,85 +101,7 @@ bool AdbCryptoUtils::generateRsaKeys(int keyLengthBits) {
     return true;
 }
 
-// bool AdbCryptoUtils::savePrivateKey(const char *filename)
-// {
-//     FILE* file = fopen(filename, "wb");
-//     if (file == nullptr) {
-//         std::cerr << "Failed to open file for saving private key." << std::endl;
-//         return false;  // 文件打开失败
-//     }
-
-//     // 使用 OpenSSL 的 PEM_write_PrivateKey 将私钥写入文件
-//     if (PEM_write_PrivateKey(file, private_key_, nullptr, nullptr, 0, nullptr, nullptr) == 0) {
-//         std::cerr << "Failed to write private key to file." << std::endl;
-//         fclose(file);  // 确保文件关闭
-//         return false;  // 写入失败
-//     }
-
-//     fclose(file);  // 确保文件关闭
-//     return true;  // 成功
-// }
-
-// bool AdbCryptoUtils::savePublicKey(const char *filename)
-// {
-//     FILE* file = fopen(filename, "wb");
-//     if (file == nullptr) {
-//         std::cerr << "Failed to open file for saving public key." << std::endl;
-//         return false;  // 文件打开失败
-//     }
-
-//     // 使用 OpenSSL 的 PEM_write_PUBKEY 将公钥写入文件
-//     if (PEM_write_PUBKEY(file, public_key_) == 0) {
-//         std::cerr << "Failed to write public key to file." << std::endl;
-//         fclose(file);  // 确保文件关闭
-//         return false;  // 写入失败
-//     }
-
-//     fclose(file);  // 确保文件关闭
-//     return true;  // 成功
-// }
-
-// bool AdbCryptoUtils::loadPrivateKey(const char *filename)
-// {
-//     BIO* bio = BIO_new_file(filename, "rb");
-//     if (bio == nullptr) {
-//         std::cerr << "Failed to open file: " << filename << std::endl;
-//         return false;
-//     }
-
-//     // 从 BIO 中读取私钥
-//     private_key_ = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
-//     BIO_free(bio);
-
-//     if (private_key_ == nullptr) {
-//         std::cerr << "Failed to load private key from BIO" << std::endl;
-//         return false;
-//     }
-
-//      return true;  //
-// }
-
-// bool AdbCryptoUtils::loadPublicKey(const char *filename)
-// {
-//     BIO* bio = BIO_new_file(filename, "rb");
-//     if (bio == nullptr) {
-//         std::cerr << "Failed to open public key file: " << filename << std::endl;
-//         return false;
-//     }
-
-//     //从 BIO 中读取公钥
-//     public_key_ = PEM_read_bio_PUBKEY(bio, nullptr, nullptr, nullptr);
-//     BIO_free(bio);
-
-//     if (public_key_ == nullptr) {
-//         std::cerr << "Failed to load public key!" << std::endl;
-//         return false;
-//     }
-
-//     return true;
-// }
-
-bool AdbCryptoUtils::savePrivateKey(const char* filename)
+bool CryptoUtils::savePrivateKey(const char* filename)
 {
     BIO* bio = BIO_new_file(filename, "wb");
     if (bio == nullptr) {
@@ -197,7 +119,7 @@ bool AdbCryptoUtils::savePrivateKey(const char* filename)
     return true;
 }
 
-bool AdbCryptoUtils::savePublicKey(const char* filename)
+bool CryptoUtils::savePublicKey(const char* filename)
 {
     BIO* bio = BIO_new_file(filename, "wb");
     if (bio == nullptr) {
@@ -215,7 +137,7 @@ bool AdbCryptoUtils::savePublicKey(const char* filename)
     return true;
 }
 
-bool AdbCryptoUtils::loadPrivateKey(const char* filename)
+bool CryptoUtils::loadPrivateKey(const char* filename)
 {
     BIO* bio = BIO_new_file(filename, "rb");
     if (bio == nullptr) {
@@ -234,7 +156,7 @@ bool AdbCryptoUtils::loadPrivateKey(const char* filename)
     return true;
 }
 
-bool AdbCryptoUtils::loadPublicKey(const char* filename)
+bool CryptoUtils::loadPublicKey(const char* filename)
 {
     BIO* bio = BIO_new_file(filename, "rb");
     if (bio == nullptr) {
@@ -254,7 +176,7 @@ bool AdbCryptoUtils::loadPublicKey(const char* filename)
 }
 
 
-std::vector<uint8_t> AdbCryptoUtils::signAdbTokenPayload(const std::vector<uint8_t>& payload) {
+std::vector<uint8_t> CryptoUtils::signAdbTokenPayload(const std::vector<uint8_t>& payload) {
     unsigned char hash[MY_SHA_DIGEST_LENGTH];
     // 计算 SHA1 摘要
     if (SHA1(payload.data(), payload.size(), hash) == nullptr) {
@@ -295,7 +217,7 @@ std::vector<uint8_t> AdbCryptoUtils::signAdbTokenPayload(const std::vector<uint8
     return sig;
 }
 
-std::vector<uint8_t> AdbCryptoUtils::getPublicKeyBytes() {
+std::vector<uint8_t> CryptoUtils::getPublicKeyBytes() {
     // 先计算出公钥序列化后的长度
     int pubkey_len = i2d_PUBKEY(public_key_, nullptr);
     if (pubkey_len <= 0) {

@@ -1,22 +1,17 @@
 #include "wifiserver.h"
 
-#include "AdbProtocol.h"
-#include "AdbCryptoUtils.h"
-#include "DeviceContext.h"
-
 #include<qDebug>
-
 #include <WinSock2.h>
 #include <ws2tcpip.h>
-#include <sstream>
-#include <fstream>
 #include <Qvector>
 #include<vector>
 #include<string>
 #include <QThread>
+#include <sstream>
 
-
-
+#include "protocol/AdbProtocol.h"
+#include "utils/CryptoUtils.h"
+#include "context/DeviceContext.h"
 
 
 WifiServer::WifiServer():networkInitialized(false){
@@ -47,6 +42,7 @@ bool WifiServer::connect(DeviceContext &ctx)
 
     auto &info=ctx.connectInfo;
     std::string ip = info.ipAddress.toStdString();
+
     unsigned short port = static_cast<unsigned short>(info.port);
 
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -66,12 +62,10 @@ bool WifiServer::connect(DeviceContext &ctx)
         return false;
     }
 
-    ctx.socket=sock;
+    ctx.transPort->setSocket(sock);
 
     return true;
 }
-
-
 
 //提取auth后的字符
 std::map<std::string, std::string> parseDeviceInfo(const std::vector<uint8_t>& payload) {
@@ -97,37 +91,36 @@ std::map<std::string, std::string> parseDeviceInfo(const std::vector<uint8_t>& p
 
 
 bool WifiServer::auth(DeviceContext& ctx) {
-    SOCKET s=ctx.socket;
     AdbMessage &Msg=ctx.msg;
-
+    auto& transPort=ctx.transPort;
     std::vector<uint8_t> connectMessage = AdbProtocol::generateConnect();
-    sendMsg(s,connectMessage);
+    transPort->sendMsg(connectMessage);
 
     // 等待 AUTH 请求（type = TOKEN）
-    if (!waitForCommand(s,AdbProtocol::CMD_AUTH,Msg)) {
+    if (!transPort->waitForCommand(AdbProtocol::CMD_AUTH,Msg)) {
         qDebug() << "未收到 AUTH TOKEN";
         return false;
     }
 
     //  签名 TOKEN 并发送 AUTH(type=signature)
-    std::vector<uint8_t> sigload = AdbCryptoUtils::getInstance().signAdbTokenPayload(Msg.payload);
+    std::vector<uint8_t> sigload = CryptoUtils::getInstance().signAdbTokenPayload(Msg.payload);
     std::vector<uint8_t> sigMsg = AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_SIGNATURE, sigload);
-    sendMsg(s, sigMsg);
+    transPort->sendMsg(sigMsg);
 
     //  再等待回应，可能是 CNXN 或再次 AUTH（type=public key）
-    if (!waitForRecv(s,Msg)) {
+    if (!transPort->waitForRecv(Msg)) {
         qDebug() << "签名后无回应";
         return false;
     }
 
     if (Msg.command == AdbProtocol::CMD_AUTH) {
         // 签名不被信任，发送 PUBLIC KEY
-        std::vector<uint8_t> pubKey = AdbCryptoUtils::getInstance().getPublicKeyBytes();
+        std::vector<uint8_t> pubKey = CryptoUtils::getInstance().getPublicKeyBytes();
         std::vector<uint8_t> authPubKey = AdbProtocol::generateAuth(AdbProtocol::AUTH_TYPE_RSA_PUBLIC, pubKey);
-        sendMsg(s, authPubKey);
+        transPort->sendMsg(authPubKey);
 
         // 最后等 CNXN
-        if (!waitForCommand(s, AdbProtocol::CMD_CNXN)) {
+        if (!transPort->waitForCommand(AdbProtocol::CMD_CNXN,Msg)) {
             qDebug() << "发送公钥后未连接成功";
             return false;
         }
@@ -417,15 +410,12 @@ bool WifiServer::execute(DeviceContext &ctx)    //后续解耦
 
     //执行
 
-    const auto& cmd = ctx.cmd;
-    switch (cmd.type) {
-    case CmdType::Push:
-        return pushHandler(socket);   //需要命令的参数 socket发送，缓冲区数据，以及结果，
-    // case CmdType::Shell:
-    //     return handleShell(ctx, cmd.params);
-    default:
-        return false;
-    }
+    // const auto& cmd = ctx.cmd;
+    // auto it=CommandHandlers.find(cmd.type);
+    // if (it != CommandHandlers.end()) {
+    //     return it->second->CommandHandler(TransPort, ctx);
+    // }
+    return false;
 
 
 
@@ -610,27 +600,27 @@ bool WifiServer::execute(DeviceContext &ctx)    //后续解耦
 // }
 
 
-std::string WifiServer::extractShellResult(const std::vector<std::string>& payloads, const std::string& cmdEcho) {
-    qDebug()<<"提取";
-    for (const auto& line : payloads) {
-        // 跳过命令回显
-        if (line.find(cmdEcho) != std::string::npos)
-            continue;
+// std::string WifiServer::extractShellResult(const std::vector<std::string>& payloads, const std::string& cmdEcho) {
+//     qDebug()<<"提取";
+//     for (const auto& line : payloads) {
+//         // 跳过命令回显
+//         if (line.find(cmdEcho) != std::string::npos)
+//             continue;
 
-        // 跳过提示符
-        if (line.find("/ $") != std::string::npos || line.find(":~$") != std::string::npos)
-            continue;
+//         // 跳过提示符
+//         if (line.find("/ $") != std::string::npos || line.find(":~$") != std::string::npos)
+//             continue;
 
-        // 去除结尾 \r \n
-        std::string cleaned = line;
-        cleaned.erase(cleaned.find_last_not_of("\r\n") + 1);
+//         // 去除结尾 \r \n
+//         std::string cleaned = line;
+//         cleaned.erase(cleaned.find_last_not_of("\r\n") + 1);
 
-        if (!cleaned.empty())
-            return cleaned;
-    }
-    qDebug()<<"提取失败";
-    return {};
-}
+//         if (!cleaned.empty())
+//             return cleaned;
+//     }
+//     qDebug()<<"提取失败";
+//     return {};
+// }
 
 
 
@@ -725,23 +715,23 @@ bool WifiServer::close(DeviceContext &ctx)
 
 
 
-std::vector<uint8_t> WifiServer::create_adb_packet(const std::string& payload) {
-    std::vector<uint8_t> packet;
-    uint32_t length = static_cast<uint32_t>(payload.length());
+// std::vector<uint8_t> WifiServer::create_adb_packet(const std::string& payload) {
+//     std::vector<uint8_t> packet;
+//     uint32_t length = static_cast<uint32_t>(payload.length());
 
-    // 添加长度字段（网络字节序）
-    packet.push_back((length >> 24) & 0xFF);
-    packet.push_back((length >> 16) & 0xFF);
-    packet.push_back((length >> 8) & 0xFF);
-    packet.push_back(length & 0xFF);
+//     // 添加长度字段（网络字节序）
+//     packet.push_back((length >> 24) & 0xFF);
+//     packet.push_back((length >> 16) & 0xFF);
+//     packet.push_back((length >> 8) & 0xFF);
+//     packet.push_back(length & 0xFF);
 
-    // 添加payload
-    for (char c : payload) {
-        packet.push_back(static_cast<uint8_t>(c));
-    }
+//     // 添加payload
+//     for (char c : payload) {
+//         packet.push_back(static_cast<uint8_t>(c));
+//     }
 
-    return packet;
-}
+//     return packet;
+// }
 
 // std::string WifiServer::adb_version_response(int version = 31) {
 //     if (version < 0 || version >= 0x10000) {
@@ -754,74 +744,74 @@ std::vector<uint8_t> WifiServer::create_adb_packet(const std::string& payload) {
 
 // 处理 scrcpy 发来的 host: 系列命令
 
-std::string WifiServer::buildAdbStringResponse(const std::string& payloadStr) {
-    std::string response = "OKAY";
+// std::string WifiServer::buildAdbStringResponse(const std::string& payloadStr) {
+//     std::string response = "OKAY";
 
-    uint32_t len = static_cast<uint32_t>(payloadStr.size());
-    char lenBytes[4] = {
-        static_cast<char>((len >> 24) & 0xFF),
-        static_cast<char>((len >> 16) & 0xFF),
-        static_cast<char>((len >> 8) & 0xFF),
-        static_cast<char>((len) & 0xFF),
-    };
-    response.append(lenBytes, 4);
-    response.append(payloadStr);
-    return response;
-}
-
-
+//     uint32_t len = static_cast<uint32_t>(payloadStr.size());
+//     char lenBytes[4] = {
+//         static_cast<char>((len >> 24) & 0xFF),
+//         static_cast<char>((len >> 16) & 0xFF),
+//         static_cast<char>((len >> 8) & 0xFF),
+//         static_cast<char>((len) & 0xFF),
+//     };
+//     response.append(lenBytes, 4);
+//     response.append(payloadStr);
+//     return response;
+// }
 
 
-void WifiServer::handleHostCommand(std::string& cmdStr, int clientSocket) {
-    // if (rawData.size() < 4) {
-    //     qDebug() << "数据不足，无法解析";
-    //     return;
-    // }
 
-    // // 第一步：解析命令长度
-    // std::string lenStr(rawData.begin(), rawData.begin() + 4);  // 比如 "000c"
-    // int payloadLen = std::stoi(lenStr, nullptr, 16);
 
-    // if (rawData.size() < 4 + payloadLen) {
-    //     qDebug() << "数据未接收完整";
-    //     return;
-    // }
+// void WifiServer::handleHostCommand(std::string& cmdStr, int clientSocket) {
+//     // if (rawData.size() < 4) {
+//     //     qDebug() << "数据不足，无法解析";
+//     //     return;
+//     // }
 
-    // 第二步：提取命令字符串
-    // std::string cmdStr(rawData.begin() + 4, rawData.begin() + 4 + payloadLen);
-    qDebug() << "收到 host 命令:" << QString::fromStdString(cmdStr);
+//     // // 第一步：解析命令长度
+//     // std::string lenStr(rawData.begin(), rawData.begin() + 4);  // 比如 "000c"
+//     // int payloadLen = std::stoi(lenStr, nullptr, 16);
 
-    // 构造响应内容
-    std::string response;
+//     // if (rawData.size() < 4 + payloadLen) {
+//     //     qDebug() << "数据未接收完整";
+//     //     return;
+//     // }
 
-    if (cmdStr == "host:version") {
-        std::string payload = "0029";  // adb版本31 = 0x001f
-        response = "OKAY0004" + payload;
-        //response=buildAdbBinaryResponse("0029");
-        response=buildAdbStringResponse("0029");
-    } else if (cmdStr.find("host:devices")!=std::string::npos) {
-        std::string deviceList = "192.168.1.2:5555\tdevice\n";
-        response=buildAdbStringResponse(deviceList);
-    } /*else if (cmdStr.find("host:transport") != std::string::npos) {
-        // host:transport:序列号/设备ip
-        response = "OKAY";  // 表示切换 transport 成功
-        // 后续数据将以 wire protocol 处理（比如 OPEN/WRTE 等）
-        //isTransported = true;
+//     // 第二步：提取命令字符串
+//     // std::string cmdStr(rawData.begin() + 4, rawData.begin() + 4 + payloadLen);
+//     qDebug() << "收到 host 命令:" << QString::fromStdString(cmdStr);
 
-    } else {
-        std::string unknown = "unknown command\n";
-        std::ostringstream oss;
-        oss << "FAIL" << std::setw(4) << std::setfill('0') << std::hex << unknown.size();
-        oss << unknown;
-        response = oss.str();
-    }*/
+//     // 构造响应内容
+//     std::string response;
 
-    // 第三步：发送回应
-    //send(clientSocket, response.data(), response.size(), 0);
-    qDebug()<<"response"<<response.data()<<"长度"<<response.size();
-    send(clientSocket, response.data(), response.size(), 0);
-    qDebug() << "已回复 host 指令:" << QString::fromStdString(cmdStr);
-}
+//     if (cmdStr == "host:version") {
+//         std::string payload = "0029";  // adb版本31 = 0x001f
+//         response = "OKAY0004" + payload;
+//         //response=buildAdbBinaryResponse("0029");
+//         response=buildAdbStringResponse("0029");
+//     } else if (cmdStr.find("host:devices")!=std::string::npos) {
+//         std::string deviceList = "192.168.1.2:5555\tdevice\n";
+//         response=buildAdbStringResponse(deviceList);
+//     } /*else if (cmdStr.find("host:transport") != std::string::npos) {
+//         // host:transport:序列号/设备ip
+//         response = "OKAY";  // 表示切换 transport 成功
+//         // 后续数据将以 wire protocol 处理（比如 OPEN/WRTE 等）
+//         //isTransported = true;
+
+//     } else {
+//         std::string unknown = "unknown command\n";
+//         std::ostringstream oss;
+//         oss << "FAIL" << std::setw(4) << std::setfill('0') << std::hex << unknown.size();
+//         oss << unknown;
+//         response = oss.str();
+//     }*/
+
+//     // 第三步：发送回应
+//     //send(clientSocket, response.data(), response.size(), 0);
+//     qDebug()<<"response"<<response.data()<<"长度"<<response.size();
+//     send(clientSocket, response.data(), response.size(), 0);
+//     qDebug() << "已回复 host 指令:" << QString::fromStdString(cmdStr);
+// }
 
 
 // 发送 OKAY 包的辅助函数
@@ -863,53 +853,3 @@ void WifiServer::handleHostCommand(std::string& cmdStr, int clientSocket) {
 
 // }
 
-bool WifiServer::sendMsg(SOCKET socket_,std::vector<uint8_t>& sendMsg) {   //根据套接字来发送
-    int sendLen = send(socket_, reinterpret_cast<const char*>(sendMsg.data()), sendMsg.size(), 0);
-    return sendLen >0;
-}
-
-bool WifiServer::recvMsg(SOCKET sock,AdbMessage& outMsg) {
-    char tempBuf[512];
-    std::vector<uint8_t>recvBuffer(512);
-    int recvLen = recv(sock, tempBuf, sizeof(tempBuf), 0);
-    if (recvLen <= 0) {
-        qDebug()<<"接收出错";
-        return false;
-    }
-
-    // 粘包缓冲
-    recvBuffer.insert(recvBuffer.end(), tempBuf, tempBuf + recvLen);
-
-    while (true) {
-        size_t msgLen = 0;
-        auto result = AdbProtocol::parseAdbMessage(recvBuffer, msgLen);
-        if (!result.has_value()) {
-            qDebug()<<"数据不够，继续接收";
-            break;
-        }
-
-        outMsg = result.value();  // 取出已完成包
-        recvBuffer.erase(recvBuffer.begin(),recvBuffer.begin() + msgLen);  // 移除已消费
-        return true;
-    }
-
-    return false;  // 当前数据不足，等待更多数据
-}
-
-
-bool WifiServer::waitForRecv(SOCKET socket_,AdbMessage& outMsg,int maxAttempts, int intervalMs) {
-    for (int i = 0; i < maxAttempts; ++i) {
-        if (recvMsg(socket_,outMsg)) {
-            return true;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    return false;
-}
-
-bool WifiServer::waitForCommand(SOCKET socket_, uint32_t expectCmd,AdbMessage& inputMsg) {
-    if (!waitForRecv(socket_,inputMsg)) {
-        return false;
-    }
-    return inputMsg.command == expectCmd;
-}

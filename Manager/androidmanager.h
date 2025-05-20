@@ -13,7 +13,7 @@
 #include <QList>
 #include <QSet>
 
-#include <adbServer/AdbServer.h>
+
 
 class AddDeviceWorker;    // 前向声明新增设备处理线程类
 class RemoveDeviceWorker; // 前向声明移除设备处理线程类

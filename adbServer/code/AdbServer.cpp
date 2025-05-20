@@ -1,17 +1,22 @@
 #include "AdbServer.h"
 
-#include "ThreadPool.h"
 
 #include <QNetworkProxy>
 #include<qdebug.h>
 #include <string>
 #include <thread>
 #include <sstream>
-
+#include<WinSock2.h>
 #include <iostream>
 #include <string>
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+
+
+#include "utils/ThreadPool.h"
+#include "states/ConnectingState.h"
+#include "states/DisconnectedState.h"
+#include"context/DeviceContext.h"
 
 
 AdbServer &AdbServer::getInstance()
@@ -78,29 +83,15 @@ bool AdbServer::unregisterDevice(const std::string &deviceId)
 
 std::vector<std::string> AdbServer::getRegisteredDevices() const
 {
+    qDebug()<<"AdbServer::getRegisteredDevices()";
     std::vector<std::string> deviceIds;
     for (const auto& pair : deviceContextMap) {
         deviceIds.push_back(pair.first);
-
         qDebug() << QString::fromStdString(pair.first);  //
     }
 
     return deviceIds;
 }
-
-// bool AdbServer::connectDevice(const std::string& deviceId)
-// {
-//     auto ctx = getDeviceContext(deviceId);
-//     if (!ctx) return false;
-//     setState(deviceId, std::make_unique<ConnectingState>());
-//     qDebug()<<"adb连接设备";
-
-//     return ctx->currentState->handle(*ctx);  // 直接传递 ctx,返回结果
-// }
-
-// #include <functional> // For std::bind
-
-
 
 bool AdbServer::disconnectDevice(const std::string &deviceId)
 {
@@ -121,11 +112,11 @@ bool AdbServer::disconnectDevice(const std::string &deviceId)
 //     return ctx->currentState->handle(*ctx);
 // }
 
-DeviceStatus AdbServer::getDeviceStatus(const std::string &deviceId) const
-{
-    auto context=getDeviceContext(deviceId);
-    return context==nullptr?DeviceStatus::Disconnected:context->status;
-}
+// DeviceStatus AdbServer::getDeviceStatus(const std::string &deviceId) const
+// {
+//     auto context=getDeviceContext(deviceId);
+//     return context==nullptr?DeviceStatus::Disconnected:context->status;
+// }
 
 bool AdbServer::isDeviceConnected(const std::string &deviceId) const
 {
@@ -138,7 +129,7 @@ bool AdbServer::isDeviceConnected(const std::string &deviceId) const
 
 AdbServer::AdbServer()
 {
-    fac=std::make_unique<DeviceServerFactory>();
+    fac=std::make_unique<IServerFactory>();
     this->start();
     ThreadPool::getInstance().submit([this](){
         this->acceptSocket();  //监听
@@ -150,7 +141,7 @@ AdbServer::AdbServer()
 
 // }
 
-bool AdbServer::setState(const std::string &deviceId, std::unique_ptr<IAdbState> newState)
+bool AdbServer::setState(const std::string &deviceId, std::unique_ptr<IState> newState)
 {
     DeviceContext& context=deviceContextMap[deviceId];
     context.currentState=std::move(newState);
@@ -201,11 +192,44 @@ void AdbServer::handleClient(int clientSocket) {
     while (readMessage1(clientSocket, jsonStr)) {
         qDebug()<< "收到命令: " << jsonStr;
         auto parsed = json::parse(jsonStr);
-         std::string cmd = parsed["cmd"];
-        std::string src = parsed["params"]["src"];
-        std::string dst = parsed["params"]["dst"];
-        QString qsrc = QString::fromStdString(src);
-        qDebug() << "src:" << qsrc;
+        std::string target = parsed["target"];   //去出操作对象
+        DeviceContext * ctx=getDeviceContext(target);//找到
+
+
+
+
+
+        //解析提取存入上下文，查找ctx调用执行
+
+
+        //std::string cmd = parsed["cmd"];
+
+        //{\"params\":\"-l\",\"target\":\"all\",\"type\":\"select\"}
+
+        //{\"params\":{\"dst\":\"/data/local/tmp/scrcpy-server.jar\",\"src\":\"D:\\\\Documents\\\\mineQtScrcpy\\\\scrcpy\\\\scrcpy-server\"},\"target\":\"192.168.1.2:5555\",\"type\":\"push\"}
+
+        //根据target找到context
+        //构造Push命令，传入context
+        CommandInfo& cmdInfo=ctx->cmd;
+        std::string type = parsed["type"];   //序列号找ctx,去执行
+        if(type=="push"){   //执行push
+            cmdInfo.type=CmdType::Push;
+            std::string src = parsed["params"]["src"];
+            std::string dst = parsed["params"]["dst"];
+            cmdInfo.params.emplace_back(target);
+            cmdInfo.params.emplace_back(src);
+            cmdInfo.params.emplace_back(dst);
+            qDebug()<<QString::fromStdString(target)<<QString::fromStdString(src)<<QString::fromStdString(dst);
+        }
+
+
+
+        ctx->strategy->execute(*ctx);
+        // if(cmd=="shell"){
+
+            // }
+
+
 
         // // 如果你不确定是否存在，可以加检查
         // if (parsed.contains("params") && parsed["params"].contains("src")) {
@@ -216,9 +240,6 @@ void AdbServer::handleClient(int clientSocket) {
         //     qDebug() << "字段不存在";
         // }
 
-        if(cmd=="push"){
-
-        }
 
 
         //processCommand(clientSocket,cmd);

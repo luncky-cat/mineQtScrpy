@@ -1,10 +1,10 @@
 #ifndef ADBPROTOCOL_H
 #define ADBPROTOCOL_H
 
-#include "AdbMessage.h"
-
 #include <optional>
 #include <string>
+
+#include "AdbMessage.h"
 
 class AdbProtocol {
 public:
@@ -22,7 +22,6 @@ public:
     static const unsigned CMD_CLSE;
     static const unsigned CMD_WRTE;
     static std::vector<uint8_t> CONNECT_PAYLOAD;
-
     static unsigned getPayloadChecksum(const std::vector<uint8_t>& payload, unsigned offset);
     static std::vector<uint8_t> generateMessage(unsigned cmd, unsigned arg0, unsigned arg1, const std::vector<uint8_t>& payload);
     static std::vector<uint8_t> generateConnect();
@@ -31,9 +30,7 @@ public:
     static std::vector<uint8_t> generateWrite(int localId, int remoteId, const std::vector<uint8_t>& data);
     static std::vector<uint8_t> generateClose(int localId, int remoteId);
     static std::vector<uint8_t> generateReady(int localId, int remoteId);
-    //static AdbMessage parseAdbMessage(std::vector<uint8_t>& data);
     static void printAdbMessage(const AdbMessage& msg);
-   // static std::optional<AdbMessage> parseAdbMessage(std::vector<uint8_t> &data);
     static std::optional<AdbMessage> parseAdbMessage(const std::vector<uint8_t> &buffer, size_t &outMessageLength);
 };
 
