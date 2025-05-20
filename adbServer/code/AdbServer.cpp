@@ -61,17 +61,13 @@ const DeviceContext *AdbServer::getDeviceContext(const std::string &deviceId) co
 
 bool AdbServer::registerDevice(const ConnectInfo& info) {
     std::string deviceId=info.deviceId.toStdString();
-
-    if(getDeviceContext(deviceId)){  //找到了
-        return false;
+    if(getDeviceContext(deviceId)){
+        return true;
     }
-
-    qDebug()<<"注册"<<info.deviceId;
-
-    DeviceContext context(fac->create(info.ConnectType));  //传入参数
+    qDebug()<<"注册设备"<<info.deviceId;
+    DeviceContext context(IServerFac->create(info.ConnectType),std::move(ITransPortFac->create(info.ConnectType)));  //传入参数
     context.setConnectInfo(info);
     deviceContextMap[deviceId] = std::move(context);
-
     return true;
 }
 
@@ -103,20 +99,6 @@ bool AdbServer::disconnectDevice(const std::string &deviceId)
     return true;
 }
 
-// bool AdbServer::executeCommand(const std::string &deviceId, const std::string &command, std::function<void (const std::vector<uint8_t> &)> callback)
-// {
-//     auto ctx = getDeviceContext(deviceId);
-//     if (!ctx) return false;
-//     //将命令传入
-//     setState(deviceId, std::make_unique<ConnectedState>());
-//     return ctx->currentState->handle(*ctx);
-// }
-
-// DeviceStatus AdbServer::getDeviceStatus(const std::string &deviceId) const
-// {
-//     auto context=getDeviceContext(deviceId);
-//     return context==nullptr?DeviceStatus::Disconnected:context->status;
-// }
 
 bool AdbServer::isDeviceConnected(const std::string &deviceId) const
 {
@@ -129,17 +111,15 @@ bool AdbServer::isDeviceConnected(const std::string &deviceId) const
 
 AdbServer::AdbServer()
 {
-    fac=std::make_unique<IServerFactory>();
+    IServerFac=std::make_unique<IServerFactory>();
+    ITransPortFac=std::make_unique<ITransPortFactory>();
+
     this->start();
     ThreadPool::getInstance().submit([this](){
         this->acceptSocket();  //监听
     });
 }
 
-// AdbServer::AdbServer()
-// {
-
-// }
 
 bool AdbServer::setState(const std::string &deviceId, std::unique_ptr<IState> newState)
 {
@@ -167,12 +147,6 @@ void AdbServer::start() {
 
     qDebug()<< "ADB server listening on port " << ADB_PORT;
 
-    // while (true) {
-    //     int clientSocket = accept(serverSocket, nullptr, nullptr);
-    //     if (clientSocket >= 0) {
-    //         std::thread(&AdbServer::handleClient, this, clientSocket).detach();
-    //     }
-    // }
 }
 
 
@@ -192,27 +166,16 @@ void AdbServer::handleClient(int clientSocket) {
     while (readMessage1(clientSocket, jsonStr)) {
         qDebug()<< "收到命令: " << jsonStr;
         auto parsed = json::parse(jsonStr);
-        std::string target = parsed["target"];   //去出操作对象
-        DeviceContext * ctx=getDeviceContext(target);//找到
+        std::string type = parsed["type"];   //找操作类型
+        std::string target = parsed["target"];
 
-
-
-
-
-        //解析提取存入上下文，查找ctx调用执行
-
-
-        //std::string cmd = parsed["cmd"];
-
-        //{\"params\":\"-l\",\"target\":\"all\",\"type\":\"select\"}
-
-        //{\"params\":{\"dst\":\"/data/local/tmp/scrcpy-server.jar\",\"src\":\"D:\\\\Documents\\\\mineQtScrcpy\\\\scrcpy\\\\scrcpy-server\"},\"target\":\"192.168.1.2:5555\",\"type\":\"push\"}
-
-        //根据target找到context
-        //构造Push命令，传入context
+        if(target=="all"){  //为所有的对象执行
+            return;
+        }
+        DeviceContext * ctx=getDeviceContext(target);//找到某个特定的
         CommandInfo& cmdInfo=ctx->cmd;
-        std::string type = parsed["type"];   //序列号找ctx,去执行
         if(type=="push"){   //执行push
+            qDebug()<<"执行push";
             cmdInfo.type=CmdType::Push;
             std::string src = parsed["params"]["src"];
             std::string dst = parsed["params"]["dst"];
@@ -222,29 +185,12 @@ void AdbServer::handleClient(int clientSocket) {
             qDebug()<<QString::fromStdString(target)<<QString::fromStdString(src)<<QString::fromStdString(dst);
         }
 
+        if(type=="select"){
+              qDebug()<<"执行select";
+             cmdInfo.type=CmdType::Shell;
 
-
+        }
         ctx->strategy->execute(*ctx);
-        // if(cmd=="shell"){
-
-            // }
-
-
-
-        // // 如果你不确定是否存在，可以加检查
-        // if (parsed.contains("params") && parsed["params"].contains("src")) {
-        //     std::string src = parsed["params"]["src"];  // 注意这一步
-        //     QString qsrc = QString::fromStdString(src);
-        //     qDebug() << "src:" << qsrc;
-        // } else {
-        //     qDebug() << "字段不存在";
-        // }
-
-
-
-        //processCommand(clientSocket,cmd);
-        // const std::vector<uint8_t> rawData(cmd.begin(),cmd.end());
-        //WifiServer::instance().handleHostCommand(cmd,clientSocket);
     }
     closesocket(clientSocket);
 }

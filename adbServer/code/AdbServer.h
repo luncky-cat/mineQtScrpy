@@ -7,6 +7,7 @@
 
 class DeviceContext;
 
+#include"transport/TransPortFactory.hpp"
 #include "server/DeviceServerFactory.hpp"
 #include "interfaces/IState.h"
 
@@ -59,7 +60,8 @@ private:
     int serverSocket;
 private:
     std::unordered_map<std::string, DeviceContext> deviceContextMap;
-    std::unique_ptr<IServerFactory>fac;  //用于得到需要的服务
+    std::unique_ptr<IServerFactory>IServerFac;  //用于得到需要的服务
+    std::unique_ptr<ITransPortFactory>ITransPortFac;  //用于得到通信器
 };
 
 #endif // ADBSERVER_H
