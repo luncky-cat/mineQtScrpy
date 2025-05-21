@@ -7,6 +7,7 @@
 #include<thread>
 #include<WinSock2.h>
 #include <qDebug>
+#include <set>
 
 SocketTransPort::SocketTransPort(){}
 
@@ -42,7 +43,7 @@ bool SocketTransPort::recvMsg(AdbMessage& outMsg) {
         }
 
         outMsg = result.value();  // 取出已完成包
-        qDebug()<<"有数据"<<outMsg.command;
+        qDebug()<<"有一个数据包去出"<<outMsg.command;
         recvBuffer_.erase(recvBuffer_.begin(),recvBuffer_.begin() + msgLen);  // 移除已消费
         return true;
     }
@@ -61,9 +62,10 @@ bool SocketTransPort::waitForRecv(AdbMessage& outMsg,int maxAttempts, int interv
     return false;
 }
 
-bool SocketTransPort::waitForCommand(uint32_t expectCmd,AdbMessage& inputMsg) {
+bool SocketTransPort::waitForCommands(const std::set<uint32_t>& expectedCmds, AdbMessage& inputMsg) {
     if (!waitForRecv(inputMsg)) {
-        return false;
+        return false; // 接收失败
     }
-    return inputMsg.command == expectCmd;
+    return expectedCmds.count(inputMsg.command) > 0;
 }
+
