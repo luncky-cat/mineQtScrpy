@@ -9,6 +9,7 @@
 #include "protocol/AdbSyncProtocol.h"
 #include "protocol/AdbProtocol.h"
 
+pushHandler::Registrar pushHandler::registrar;
 
 bool pushHandler::pushFile(ITransPort &transport,int local_id,int remote_id,std::string& localFilePath,std::string remoteFilePath,AdbMessage &out){
     //SEND命令
@@ -16,7 +17,7 @@ bool pushHandler::pushFile(ITransPort &transport,int local_id,int remote_id,std:
     std::vector<uint8_t> sendPayload =AdbSyncProtocol::generateSEND(remotePath);
     auto sendMsg = AdbProtocol::generateWrite(local_id,remote_id,sendPayload);
     transport.sendMsg(sendMsg);
-    if (!transport.waitForCommand(AdbProtocol::CMD_OKAY,out)) {    //接收ok
+    if (!transport.waitForCommands({AdbProtocol::CMD_OKAY},out)) {    //接收ok
         qDebug() << "未收到ok";
         return false;
     }
@@ -29,23 +30,23 @@ bool pushHandler::pushFile(ITransPort &transport,int local_id,int remote_id,std:
         auto dataPayload = AdbSyncProtocol::generateDATA(buffer, file.gcount());
         auto writeMsg = AdbProtocol::generateWrite(local_id,remote_id, dataPayload);
         transport.sendMsg(writeMsg);
-        transport.waitForCommand(AdbProtocol::CMD_OKAY,out);
+        transport.waitForCommands({AdbProtocol::CMD_OKAY},out);
     }
 
     uint32_t mtime = static_cast<uint32_t>(std::time(nullptr));
     auto donePayload = AdbSyncProtocol::generateDONE(mtime);
     auto doneMsg = AdbProtocol::generateWrite(local_id, remote_id, donePayload);
     transport.sendMsg(doneMsg);
-    transport.waitForCommand(AdbProtocol::CMD_OKAY,out);
-    auto closeMsg = AdbProtocol::generateClose(local_id,remote_id);
-    transport.sendMsg(closeMsg);
+    transport.waitForCommands({AdbProtocol::CMD_OKAY},out);
+    // auto closeMsg = AdbProtocol::generateClose(local_id,remote_id);
+    // transport.sendMsg(closeMsg);
     return true;
 }
 
 bool pushHandler::openSyn(ITransPort &transport,const int local_id,int& remote_id,AdbMessage &out){
     auto openSync = AdbProtocol::generateOpen(local_id,"sync:");
     transport.sendMsg(openSync);
-    if (!transport.waitForCommand(AdbProtocol::CMD_OKAY,out)) {    //接收ok
+    if (!transport.waitForCommands({AdbProtocol::CMD_OKAY},out)) {    //接收ok
         qDebug() << "未收到ok";
         return false;
     }
@@ -55,14 +56,16 @@ bool pushHandler::openSyn(ITransPort &transport,const int local_id,int& remote_i
 
 bool pushHandler::CommandHandler(ITransPort &transport, DeviceContext &ctx)
 {
+    qDebug()<<"执行pushHandler";
+    qDebug()<<"分配的本地id"<<ctx.syncLocalId;
     if (!ctx.isOpenSync) {
-        ctx.isOpenSync=openSyn(transport,ctx.local_id,ctx.remote_id,ctx.msg);
+        ctx.isOpenSync=openSyn(transport,ctx.syncLocalId,ctx.synRemoteId,ctx.msg);
         if(!ctx.isOpenSync){
             qDebug()<<"打开syn流失败";
             return false;
         }
     }
-    bool result=pushFile(transport,ctx.local_id,ctx.remote_id,ctx.cmd.params[0],ctx.cmd.params[1],ctx.msg);
+    bool result=pushFile(transport,ctx.syncLocalId,ctx.synRemoteId,ctx.cmd.params[0],ctx.cmd.params[1],ctx.msg);
     if(result){
         qDebug()<<"推送文件成功";
     }
