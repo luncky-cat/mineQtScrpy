@@ -5,42 +5,24 @@
 
 #include "interfaces/IState.h"
 #include "interfaces//IServer.h"
-#include "interfaces/ITransPort.h"
 
-#include "DeviceStatus.h"
 #include "CommandInfo.h"
 #include "ConnectInfo.h"
-#include "protocol/AdbMessage.h"
-
+#include "DeviceStatus.h"
+#include "context/DeviceSession.h"
 
 class DeviceContext {
 public:
-    DeviceContext(IServer *strategyPtr = nullptr, ITransPort *transPortPtr = nullptr);
-    void setConnectInfo(ConnectInfo info);
-
-    //流信息相关
-    static int allocShellId;
-    static int allocSyncId;
-    bool isOpenShell;
-    bool isOpenSync;
-    int shellLocalId;
-    int syncLocalId;
-    int shellRemoteId;
-    int synRemoteId;
-
-    AdbMessage msg;
-
+    DeviceContext(ConnectInfo info);
     ConnectInfo connectInfo;  //连接信息
     CommandInfo cmd; //命令类型
     DeviceStatus status;   //状态位
-    std::map<std::string,std::string> deviceInfos;//认证成功返回的信息
-
-    std::unique_ptr<IServer>strategy;   //执行策略
-    std::unique_ptr<ITransPort> transPort;   //通信器
-    std::unique_ptr<IState> currentState;//当前状态
+    std::map<std::string, std::string> authInfos; // 认证后的设备信息
+    std::unique_ptr<DeviceSession> sessionCtx;   // 会话上下文，含 socket 与数据流
+    std::shared_ptr<IServer> cmdServer;          // 设备控制策略，用于执行命令
+    std::unique_ptr<IState> deviceState;               // 当前设备状态（认证中/已连接/断开等）
+    void setSocket(asio::ip::tcp::socket socket);
 };
-
-
 
 
 #endif // DEVICECONTEXT_H
