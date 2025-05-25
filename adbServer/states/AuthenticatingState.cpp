@@ -8,7 +8,7 @@
 
 void AuthenticatingState::handle(DeviceContext& context) {
     qDebug()<<"进入认证态";
-    bool successful=context.strategy->auth(context);
+    bool successful=context.server->auth(context);
     if(successful){
         qDebug()<<"认证成功";
         setState(context,std::make_unique<ExecutingState>());

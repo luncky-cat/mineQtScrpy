@@ -4,7 +4,7 @@
 
 void IState::setState(DeviceContext &context, std::unique_ptr<IState> newState)
 {
-    context.currentState = std::move(newState);
-    context.currentState->handle(context);
+    context.deviceState = std::move(newState);
+    context.deviceState->handle(context);
 }
 
