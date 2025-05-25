@@ -25,10 +25,6 @@ MainWindow::MainWindow(QWidget *parent)
     QWidget *central = ui->centralwidget;
     central->setLayout(mainLayout);
 
-    // 管理者逻辑
-    manger = new androidManager();
-    manger->listen();
-
     // 可选：连接侧边栏隐藏按钮
     connect(sidebar, &SidebarWidget::toggleVisibility, this, [=]() {
         sidebar->setVisible(!sidebar->isVisible());

@@ -12,9 +12,10 @@ CONFIG += debug
 INCLUDEPATH += $$PWD/third_party/openssl/include
 INCLUDEPATH += $$PWD/third_party/libusb/include
 INCLUDEPATH += $$PWD/third_party/nlohmann/include
+INCLUDEPATH += $$PWD/third_party/asio/include
 INCLUDEPATH += $$PWD/adbServer
 INCLUDEPATH += $$PWD/Device
-INCLUDEPATH += $$PWD/Scanner
+#INCLUDEPATH += $$PWD/Scanner
 
 # Windows SDK 路径
 win32 {
@@ -51,31 +52,28 @@ SOURCES += \
     CustomWidgets/SidebarWidget.cpp \
     CustomWidgets/phoneshow.cpp \
     CustomWidgets/showlayout.cpp \
-    #Device/androiddevice.cpp \
-    Device/device.cpp \
-    #Manager/AddDeviceWorker.cpp \
-    #Manager/RemoveDeviceWorker.cpp \
-    Manager/androidmanager.cpp \
-    #Manager/devicemanager.cpp \
-    Scanner/WifiScanner.cpp \
-    Scanner/WifiScannerTask.cpp \
-    Scanner/listenDevice.cpp \
-    #Scanner/listenusb.cpp \
-    Scanner/listenwifi.cpp \
-    Scanner/networkutils.cpp \
     adbServer/code/AdbServer.cpp \
-    adbServer/handlers/pushHandler.cpp \
-    adbServer/handlers/shellHandler.cpp \
+    adbServer/code/ConfigCenter.cpp \
+    adbServer/code/ScannerManager.cpp \
+    adbServer/config/WifiScannerConfig.cpp \
+    adbServer/context/AdbStreamContext.cpp \
+    adbServer/context/DeviceContext.cpp \
+    adbServer/context/DeviceSession.cpp \
+    adbServer/context/ForwardBridge.cpp \
+    adbServer/context/RemoteSession.cpp \
+    adbServer/context/RemoteSession.cpp \
     adbServer/protocol/AdbProtocol.cpp \
     adbServer/protocol/AdbSyncProtocol.cpp \
+    #adbServer/scanner/ConnectConfig/WifiConnectConfig.cpp \
+    adbServer/scanner/WifiScanner/NetworkScanner.cpp \
     adbServer/server/WifiServer.cpp \
     adbServer/states/AuthenticatingState.cpp \
     adbServer/states/ConnectingState.cpp \
     adbServer/states/DisconnectedState.cpp \
     adbServer/states/ExecutingState.cpp \
     adbServer/states/IState.cpp \
-    adbServer/transport/socketTransPort.cpp \
     adbServer/utils/CryptoUtils.cpp \
+    adbServer/utils/NetWorkUtils.cpp \
     adbServer/utils/ThreadPool.cpp \
     main.cpp \
     mainwindow.cpp
@@ -87,43 +85,51 @@ HEADERS += \
     CustomWidgets/SidebarWidget.h \
     CustomWidgets/phoneshow.h \
     CustomWidgets/showlayout.h \
-    Device/ConnectInfo.h \
-    Device/DeviceInfo.h \
-    Device/StreamStatus.h \
-    #Device/androiddevice.h \
-    Device/device.h \
-    #Manager/AddDeviceWorker.h \
-    #Manager/RemoveDeviceWorker.h \
-    Manager/androidmanager.h \
-    Manager/devicemanager.h \
-    Scanner/WifiScanner.h \
-    Scanner/WifiScannerTask.h \
-    Scanner/listenDevice.h \
-    #Scanner/listenusb.h \
-    Scanner/listenwifi.h \
-    Scanner/networkutils.h \
+    # Device/ConnectInfo.h \
+    # Device/DeviceInfo.h \
+    # Device/StreamStatus.h \
     adbServer/code/AdbServer.h \
+    # adbServer/config/ConnectConfig.h \
+    adbServer/code/ConfigCenter.h \
+    adbServer/code/ScannerManager.h \
+    adbServer/config/WifiScannerConfig.h \
+    adbServer/context/AdbStreamContext.h \
     adbServer/context/CommandInfo.h \
     adbServer/context/DeviceContext.h \
+    adbServer/context/DeviceSession.h \
     adbServer/context/DeviceStatus.h \
-    adbServer/handlers/pushHandler.h \
-    adbServer/handlers/shellHandler.h \
+    # adbServer/context/ForwardBridge.h \
+    adbServer/context/ForwardBridge.h \
+    adbServer/context/RemoteSession.h \
+    #adbServer/handlers/ForwardHandler.h \
+    #adbServer/handlers/pushHandler.h \
+    #adbServer/handlers/shellHandler.h \
     adbServer/interfaces/ICommandHandler.h \
+    adbServer/interfaces/IConfig.h \
+    adbServer/interfaces/IScanner.h \
     adbServer/interfaces/IServer.h \
     adbServer/interfaces/IState.h \
-    adbServer/interfaces/ITransPort.h \
+    #adbServer/interfaces/ITransPort.h \
     adbServer/protocol/AdbMessage.h \
     adbServer/protocol/AdbProtocol.h \
     adbServer/protocol/AdbSyncProtocol.h \
-    adbServer/server/DeviceServerFactory.hpp \
+    adbServer/scanner/ConnectConfig/WifiConnectConfig.h \
+    #adbServer/scanner/SerialScanner/listenDevice.h \
+    #adbServer/scanner/SerialScanner/listenusb.h \
+    #adbServer/scanner/WifiConnectConfig.h \
+    #adbServer/scanner/WifiScanner/WifiScanner.h \
+    #adbServer/scanner/WifiScanner/WifiScannerTask.h \
+    #adbServer/scanner/WifiScanner/listenwifi.h \
+    adbServer/scanner/WifiScanner/NetworkScanner.h \
+    #adbServer/scanner/WifiScanner/networkutils.h \
+    adbServer/server/IServerFactory.hpp \
     adbServer/server/WifiServer.h \
     adbServer/states/AuthenticatingState.h \
     adbServer/states/ConnectingState.h \
     adbServer/states/DisconnectedState.h \
     adbServer/states/ExecutingState.h \
-    adbServer/transport/TransPortFactory.hpp \
-    adbServer/transport/socketTransPort.h \
     adbServer/utils/CryptoUtils.h \
+    adbServer/utils/NetWorkUtils.h \
     adbServer/utils/ThreadPool.h \
     mainwindow.h \
     ui_mainwindow.h

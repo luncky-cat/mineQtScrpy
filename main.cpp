@@ -2,20 +2,21 @@
 
 #include <QApplication>
 
-#include <QMetaType>
-#include <QSet>
+#include"utils/ThreadPool.h"
+#include "adbServer/code/AdbServer.h"
 
-#include "Device/connectinfo.h"  // 包含 ConnectInfo 的定义
-
-Q_DECLARE_METATYPE(ConnectInfo)
+#include"code/ConfigCenter.h"
+#include"code/ScannerManager.h"
 
 int main(int argc, char *argv[])
 {
-    qRegisterMetaType<ConnectInfo>("ConnectInfo");
-    qRegisterMetaType<QSet<ConnectInfo>>("QSet<ConnectInfo>");
+    ConfigCenter::getInstance().registerAllConfigs();
+    ScannerManager::getInstance().registerAllScanners();
+    ThreadPool::getInstance().submit([] {
+        AdbServer::getInstance().start();
+    });
 
     QApplication a(argc, argv);
-
     MainWindow w;
     w.show();
     return a.exec();
